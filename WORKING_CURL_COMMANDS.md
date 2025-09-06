@@ -5,7 +5,7 @@
 Your command was incomplete:
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test \
+curl -X POST https://pcea-backend-1.onrender.com/api/simple-notification-test \
 ```
 
 You're missing the request body and headers!
@@ -15,13 +15,13 @@ You're missing the request body and headers!
 ### 1. Simple Test (Copy & Paste This Exact Command)
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test -H "Content-Type: application/json" -d '{"title":"Test from Terminal","body":"Hello from Glitch!"}'
+curl -X POST https://pcea-backend-1.onrender.com/api/simple-notification-test -H "Content-Type: application/json" -d '{"title":"Test from Terminal","body":"Hello from Glitch!"}'
 ```
 
 ### 2. Alternative Format (Multi-line for readability)
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test \
+curl -X POST https://pcea-backend-1.onrender.com/api/simple-notification-test \
 -H "Content-Type: application/json" \
 -d '{
   "title": "Test from Terminal",
@@ -33,7 +33,7 @@ curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test \
 ### 3. Even Simpler (Uses Default Values)
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test -H "Content-Type: application/json" -d '{}'
+curl -X POST https://pcea-backend-1.onrender.com/api/simple-notification-test -H "Content-Type: application/json" -d '{}'
 ```
 
 ## First, Check Your Setup
@@ -41,13 +41,13 @@ curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test -
 ### Check Server Health
 
 ```bash
-curl https://teal-truthful-seat.glitch.me/health
+curl https://pcea-backend-1.onrender.com/health
 ```
 
 ### Check FCM Status
 
 ```bash
-curl https://teal-truthful-seat.glitch.me/api/fcm-status
+curl https://pcea-backend-1.onrender.com/api/fcm-status
 ```
 
 ## Expected Responses

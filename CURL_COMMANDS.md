@@ -5,7 +5,7 @@
 The command you tried was missing required authentication and headers:
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/notifications/send
+curl -X POST https://pcea-backend-1.onrender.com/api/notifications/send
 ```
 
 ## Easy Testing Solution
@@ -15,7 +15,7 @@ I've added a simple test endpoint that doesn't require authentication:
 ### 1. Check FCM Status First
 
 ```bash
-curl https://teal-truthful-seat.glitch.me/api/fcm-status
+curl https://pcea-backend-1.onrender.com/api/fcm-status
 ```
 
 This shows how many users have FCM tokens and if Firebase is connected.
@@ -23,7 +23,7 @@ This shows how many users have FCM tokens and if Firebase is connected.
 ### 2. Send Simple Test Notification (No Auth Required)
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test \
+curl -X POST https://pcea-backend-1.onrender.com/api/simple-notification-test \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Server Test",
@@ -37,7 +37,7 @@ curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test \
 ### 1. Register a Test User
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/user/register \
+curl -X POST https://pcea-backend-1.onrender.com/api/user/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Test Admin",
@@ -49,7 +49,7 @@ curl -X POST https://teal-truthful-seat.glitch.me/api/user/register \
 ### 2. Login to Get Token
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/user/login \
+curl -X POST https://pcea-backend-1.onrender.com/api/user/login \
   -H "Content-Type: application/json" \
   -d '{
     "phone": "admin123",
@@ -60,7 +60,7 @@ curl -X POST https://teal-truthful-seat.glitch.me/api/user/login \
 ### 3. Use Token for Authenticated Requests
 
 ```bash
-curl -X POST https://teal-truthful-seat.glitch.me/api/notifications/send \
+curl -X POST https://pcea-backend-1.onrender.com/api/notifications/send \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE" \
   -d '{
@@ -75,10 +75,10 @@ To test everything quickly:
 
 ```bash
 # Check status
-curl https://teal-truthful-seat.glitch.me/api/fcm-status
+curl https://pcea-backend-1.onrender.com/api/fcm-status
 
 # Send test notification
-curl -X POST https://teal-truthful-seat.glitch.me/api/simple-notification-test \
+curl -X POST https://pcea-backend-1.onrender.com/api/simple-notification-test \
   -H "Content-Type: application/json" \
   -d '{"title":"Quick Test","body":"Testing from terminal!","testMode":true}'
 ```

@@ -83,7 +83,7 @@ const corsOptions = {
       "http://localhost:3000",
       "http://localhost:5173",
       "http://localhost:8080",
-      "https://teal-truthful-seat.glitch.me", // Your Glitch backend
+      "https://pcea-backend-1.onrender.com", // Your Render backend
       // Add your frontend domains here
     ];
 
