@@ -27,7 +27,7 @@ try {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   } else {
     // From file (for development)
-    console.log("🔧 Loading Firebase config from file...");
+    console.log("���� Loading Firebase config from file...");
     const fs = require("fs");
     const path = require("path");
     const keyPath = path.join(
@@ -786,7 +786,7 @@ app.post(
   notificationLimiter,
   async (req, res) => {
     try {
-      const { title, body, data, targetUsers, scheduledFor } = req.body;
+      const { title, body, data, targetUsers, scheduledFor, priority } = req.body;
 
       // Validation
       if (!title || !body) {
@@ -854,9 +854,18 @@ app.post(
       const message = {
         notification: { title, body },
         data: {
-          type: "announcement",
+          type: data?.type || "announcement",
+          priority: priority || 'normal',
           timestamp: new Date().toISOString(),
           ...(data || {}),
+        },
+        android: {
+          priority: priority === 'urgent' || priority === 'high' ? 'high' : 'normal',
+        },
+        apns: {
+          headers: {
+            'apns-priority': priority === 'urgent' || priority === 'high' ? '10' : '5',
+          },
         },
         tokens,
       };
@@ -870,7 +879,10 @@ app.post(
           title,
           message: body,
           type: data?.type || "announcement",
-          data: data || {},
+          data: {
+            priority: priority || 'normal',
+            ...(data || {})
+          },
           createdAt: new Date(),
         }).save();
       });
@@ -1059,7 +1071,7 @@ app.post("/api/cli/send-notification", async (req, res) => {
     }
 
     console.log(
-      `✅ CLI notification completed: ${response.successCount}/${tokens.length} sent`,
+      `�� CLI notification completed: ${response.successCount}/${tokens.length} sent`,
     );
 
     res.json({
