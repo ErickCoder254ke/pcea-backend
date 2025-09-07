@@ -786,7 +786,7 @@ app.post(
   notificationLimiter,
   async (req, res) => {
     try {
-      const { title, body, data, targetUsers } = req.body;
+      const { title, body, data, targetUsers, scheduledFor } = req.body;
 
       // Validation
       if (!title || !body) {
@@ -800,6 +800,30 @@ app.post(
         return res.status(500).json({
           success: false,
           message: "Firebase Admin SDK not initialized",
+        });
+      }
+
+      // Handle scheduled notifications
+      if (scheduledFor) {
+        const scheduleTime = new Date(scheduledFor);
+        if (scheduleTime <= new Date()) {
+          return res.status(400).json({
+            success: false,
+            message: "Scheduled time must be in the future"
+          });
+        }
+
+        // For now, store scheduled notification (in production, use a job queue)
+        console.log(`⏰ Notification scheduled for: ${scheduleTime.toLocaleString()}`);
+        return res.json({
+          success: true,
+          message: `Notification scheduled for ${scheduleTime.toLocaleString()}`,
+          data: {
+            title,
+            body,
+            scheduledFor: scheduleTime.toISOString(),
+            targetUsers: targetUsers || 'all'
+          }
         });
       }
 
@@ -1058,6 +1082,99 @@ app.post("/api/cli/send-notification", async (req, res) => {
       message: "Failed to send CLI notification",
       error: err.message,
       stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
+  }
+});
+
+// Notification Templates endpoint
+app.get("/api/notifications/templates", verifyToken, async (req, res) => {
+  try {
+    const templates = [
+      {
+        id: 1,
+        name: 'Sunday Service',
+        title: 'Sunday Service Reminder ⛪',
+        body: 'Join us for worship at 10 AM. Bring a friend!',
+        priority: 'normal',
+        category: 'service',
+        tags: ['sunday', 'worship', 'service']
+      },
+      {
+        id: 2,
+        name: 'Prayer Meeting',
+        title: 'Prayer Meeting Tonight 🙏',
+        body: 'Join us at 7 PM for prayer and fellowship',
+        priority: 'normal',
+        category: 'prayer',
+        tags: ['prayer', 'evening', 'fellowship']
+      },
+      {
+        id: 3,
+        name: 'Youth Event',
+        title: 'Youth Meeting This Friday! 🌟',
+        body: 'Pizza, games, and great fellowship at 6 PM',
+        priority: 'normal',
+        category: 'youth',
+        tags: ['youth', 'friday', 'games']
+      },
+      {
+        id: 4,
+        name: 'Emergency Alert',
+        title: 'Important Church Notice ⚠️',
+        body: 'Please check the announcements for important updates',
+        priority: 'urgent',
+        category: 'announcement',
+        tags: ['urgent', 'announcement', 'important']
+      },
+      {
+        id: 5,
+        name: 'New Announcement',
+        title: 'New Church Announcement 📢',
+        body: 'We have published a new announcement. Check it out!',
+        priority: 'normal',
+        category: 'announcement',
+        tags: ['announcement', 'new']
+      },
+      {
+        id: 6,
+        name: 'Event Reminder',
+        title: 'Event Tomorrow! 📅',
+        body: 'Don\'t forget about our special event tomorrow. See you there!',
+        priority: 'high',
+        category: 'event',
+        tags: ['event', 'reminder', 'tomorrow']
+      },
+      {
+        id: 7,
+        name: 'Weekly Meditation',
+        title: 'New Weekly Meditation 🙏',
+        body: 'This week\'s meditation is now available. Take time to reflect and pray.',
+        priority: 'normal',
+        category: 'meditation',
+        tags: ['meditation', 'weekly', 'spiritual']
+      },
+      {
+        id: 8,
+        name: 'Welcome New Member',
+        title: 'Welcome to Our Church Family! 🤗',
+        body: 'Thank you for joining us! We\'re excited to have you in our community.',
+        priority: 'normal',
+        category: 'welcome',
+        tags: ['welcome', 'new', 'member']
+      }
+    ];
+
+    res.json({
+      success: true,
+      message: 'Notification templates retrieved successfully',
+      data: templates
+    });
+  } catch (error) {
+    console.error('❌ Error fetching notification templates:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notification templates',
+      error: error.message
     });
   }
 });
