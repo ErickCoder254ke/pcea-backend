@@ -25,6 +25,11 @@ try {
     // From environment variable (recommended for production/Glitch)
     console.log("🔧 Loading Firebase config from environment variable...");
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+    // Ensure PEM format is restored for Render/production environments
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+    }
   } else {
     // From file (for development)
     console.log("🔧 Loading Firebase config from file...");
@@ -35,7 +40,7 @@ try {
       "churchapp-3efc3-firebase-adminsdk-fbsvc-b52a2b3e0e.json",
     );
 
-    console.log("🔍 Looking for Firebase file at:", keyPath);
+    console.log("�� Looking for Firebase file at:", keyPath);
     console.log("🔍 Current directory:", __dirname);
     console.log("🔍 File exists:", fs.existsSync(keyPath));
 

@@ -14,6 +14,11 @@ try {
 
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+    // Ensure PEM format is restored for Render/production environments
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+    }
   } else {
     serviceAccount = require("./churchapp-3efc3-firebase-adminsdk-fbsvc-b52a2b3e0e.json");
   }

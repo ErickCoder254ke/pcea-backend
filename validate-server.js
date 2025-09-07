@@ -95,6 +95,12 @@ try {
   let serviceAccount;
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+    // Ensure PEM format is restored for Render/production environments
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+    }
+
     console.log("  📋 Using environment variable for Firebase config");
   } else if (hasFirebaseFile) {
     serviceAccount = require(firebaseKeyPath);
