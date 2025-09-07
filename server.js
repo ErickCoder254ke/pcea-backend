@@ -222,6 +222,9 @@ const PrayerPartnership = mongoose.model(
   prayerPartnershipSchema,
 );
 
+// Import Models
+const Gallery = require("./server/models/Gallery");
+
 // Import Routes
 const eventsRouter = require("./server/routes/events");
 const announcementsRouter = require("./server/routes/announcements");
