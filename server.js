@@ -27,7 +27,7 @@ try {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   } else {
     // From file (for development)
-    console.log("���� Loading Firebase config from file...");
+    console.log("🔧 Loading Firebase config from file...");
     const fs = require("fs");
     const path = require("path");
     const keyPath = path.join(
@@ -1094,6 +1094,167 @@ app.post("/api/cli/send-notification", async (req, res) => {
       message: "Failed to send CLI notification",
       error: err.message,
       stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
+  }
+});
+
+// Notification Analytics endpoint
+app.get("/api/admin/notifications/analytics", verifyToken, async (req, res) => {
+  try {
+    const { timeframe = '7days' } = req.query;
+
+    // Calculate date range based on timeframe
+    let startDate = new Date();
+    switch(timeframe) {
+      case '24hours':
+        startDate.setHours(startDate.getHours() - 24);
+        break;
+      case '7days':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30days':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 7);
+    }
+
+    // Get notification statistics
+    const totalNotifications = await Notification.countDocuments({
+      createdAt: { $gte: startDate }
+    });
+
+    const readNotifications = await Notification.countDocuments({
+      createdAt: { $gte: startDate },
+      read: true
+    });
+
+    const unreadNotifications = totalNotifications - readNotifications;
+    const readRate = totalNotifications > 0 ? (readNotifications / totalNotifications * 100).toFixed(2) : 0;
+
+    // Get notifications by type
+    const notificationsByType = await Notification.aggregate([
+      { $match: { createdAt: { $gte: startDate } } },
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Get daily notification counts
+    const dailyStats = await Notification.aggregate([
+      { $match: { createdAt: { $gte: startDate } } },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          },
+          sent: { $sum: 1 },
+          read: { $sum: { $cond: ["$read", 1, 0] } }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Get user engagement stats
+    const totalUsers = await User.countDocuments();
+    const usersWithTokens = await User.countDocuments({
+      fcmToken: { $ne: null, $exists: true }
+    });
+
+    const analytics = {
+      summary: {
+        totalNotifications,
+        readNotifications,
+        unreadNotifications,
+        readRate: parseFloat(readRate),
+        timeframe
+      },
+      engagement: {
+        totalUsers,
+        usersWithTokens,
+        tokenCoverage: totalUsers > 0 ? (usersWithTokens / totalUsers * 100).toFixed(2) : 0
+      },
+      byType: notificationsByType.map(item => ({
+        type: item._id,
+        count: item.count
+      })),
+      dailyStats: dailyStats.map(item => ({
+        date: item._id,
+        sent: item.sent,
+        read: item.read,
+        readRate: item.sent > 0 ? (item.read / item.sent * 100).toFixed(2) : 0
+      }))
+    };
+
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error) {
+    console.error('❌ Error fetching notification analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notification analytics',
+      error: error.message
+    });
+  }
+});
+
+// Notification History endpoint
+app.get("/api/admin/notifications/history", verifyToken, async (req, res) => {
+  try {
+    const { limit = 50, page = 1, type, read } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Build query filters
+    let query = {};
+    if (type && type !== 'all') {
+      query.type = type;
+    }
+    if (read !== undefined) {
+      query.read = read === 'true';
+    }
+
+    // Get notifications with user details
+    const notifications = await Notification.find(query)
+      .populate('userId', 'name phone')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
+
+    const total = await Notification.countDocuments(query);
+
+    const history = notifications.map(notification => ({
+      id: notification._id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      read: notification.read,
+      readAt: notification.readAt,
+      createdAt: notification.createdAt,
+      user: notification.userId ? {
+        id: notification.userId._id,
+        name: notification.userId.name,
+        phone: notification.userId.phone
+      } : null,
+      data: notification.data
+    }));
+
+    res.json({
+      success: true,
+      history,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching notification history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notification history',
+      error: error.message
     });
   }
 });
