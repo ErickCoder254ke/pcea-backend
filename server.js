@@ -788,6 +788,30 @@ app.post(
     try {
       const { title, body, data, targetUsers, scheduledFor, priority } = req.body;
 
+      // Enhanced validation with detailed error messages
+      if (!title || title.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Title is required and cannot be empty'
+        });
+      }
+
+      if (!body || body.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Body is required and cannot be empty'
+        });
+      }
+
+      console.log('📨 Notification request received:', {
+        title: title?.substring(0, 50) + '...',
+        bodyLength: body?.length,
+        priority: priority || 'not specified',
+        targetUsers: Array.isArray(targetUsers) ? targetUsers.length : 'all users',
+        scheduledFor: scheduledFor || 'immediate',
+        hasFirebase: firebaseInitialized
+      });
+
       // Validation
       if (!title || !body) {
         return res.status(400).json({
@@ -851,6 +875,15 @@ app.post(
 
       console.log(`🎯 Found ${tokens.length} FCM tokens`);
 
+      if (tokens.length === 0) {
+        console.warn('⚠️ No FCM tokens found for notification');
+        return res.status(400).json({
+          success: false,
+          message: 'No users with valid FCM tokens found',
+          details: `Found ${users.length} users but none have FCM tokens`
+        });
+      }
+
       const message = {
         notification: { title, body },
         data: {
@@ -870,7 +903,27 @@ app.post(
         tokens,
       };
 
-      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log('🚀 Attempting to send notifications via Firebase...');
+      let response;
+      try {
+        response = await admin.messaging().sendEachForMulticast(message);
+        console.log('✅ Firebase messaging send completed:', {
+          successCount: response.successCount,
+          failureCount: response.failureCount
+        });
+      } catch (firebaseError) {
+        console.error('❌ Firebase messaging send failed:', {
+          error: firebaseError.message,
+          code: firebaseError.code,
+          details: firebaseError.details
+        });
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to send notifications via Firebase',
+          error: firebaseError.message,
+          code: firebaseError.code
+        });
+      }
 
       // Store notifications in database for all users
       const notificationPromises = users.map((user) => {
@@ -954,7 +1007,12 @@ app.post(
         results: process.env.NODE_ENV === "development" ? results : undefined,
       });
     } catch (err) {
-      console.error("❌ Bulk notification error:", err);
+      console.error("❌ Bulk notification error:", {
+        message: err.message,
+        stack: err.stack,
+        name: err.name,
+        timestamp: new Date().toISOString()
+      });
       res.status(500).json({
         success: false,
         message: "Failed to send bulk notifications",
@@ -1347,6 +1405,39 @@ app.get("/api/notifications/templates", verifyToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch notification templates',
+      error: error.message
+    });
+  }
+});
+
+// Admin Users endpoint - Get all users for admin panel
+app.get("/api/admin/users", verifyToken, async (req, res) => {
+  try {
+    // Get all users with basic info for admin notification targeting
+    const users = await User.find({}, 'name phone fcmToken fcmTokenPlatform createdAt lastLogin')
+      .sort({ createdAt: -1 });
+
+    const formattedUsers = users.map(user => ({
+      id: user._id,
+      name: user.name,
+      phone: user.phone,
+      hasToken: !!user.fcmToken,
+      platform: user.fcmTokenPlatform || 'unknown',
+      joinDate: user.createdAt,
+      lastLogin: user.lastLogin
+    }));
+
+    res.json({
+      success: true,
+      users: formattedUsers,
+      total: users.length,
+      withTokens: users.filter(u => u.fcmToken).length
+    });
+  } catch (error) {
+    console.error('❌ Error fetching admin users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch users',
       error: error.message
     });
   }
