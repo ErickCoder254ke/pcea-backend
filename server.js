@@ -35,10 +35,19 @@ try {
       "churchapp-3efc3-firebase-adminsdk-fbsvc-b52a2b3e0e.json",
     );
 
+    console.log("🔍 Looking for Firebase file at:", keyPath);
+    console.log("🔍 Current directory:", __dirname);
+    console.log("🔍 File exists:", fs.existsSync(keyPath));
+
     if (fs.existsSync(keyPath)) {
+      console.log("✅ Firebase service account file found!");
       serviceAccount = require("./churchapp-3efc3-firebase-adminsdk-fbsvc-b52a2b3e0e.json");
+      console.log("✅ Firebase service account loaded from file");
     } else {
-      throw new Error("Firebase service account key file not found");
+      // List files in current directory for debugging
+      const files = fs.readdirSync(__dirname);
+      console.log("📁 Files in backend directory:", files.filter(f => f.includes('firebase') || f.includes('.json')));
+      throw new Error(`Firebase service account key file not found at: ${keyPath}`);
     }
   }
 
@@ -235,6 +244,22 @@ const sermonRoutes = require("./server/routes/sermons");
 const lyricsRoutes = require("./server/routes/lyrics");
 const videoRoutes = require("./server/routes/video");
 const userRoutes = require("./server/routes/profile");
+
+// Firebase Debug endpoint to check configuration
+app.get("/firebase-debug", (req, res) => {
+  const hasEnvVar = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+  const hasFile = require('fs').existsSync('./churchapp-3efc3-firebase-adminsdk-fbsvc-b52a2b3e0e.json');
+
+  res.json({
+    firebaseInitialized,
+    hasEnvVar,
+    hasFile,
+    adminAppsLength: admin.apps.length,
+    envVarLength: process.env.FIREBASE_SERVICE_ACCOUNT?.length || 0,
+    nodeEnv: process.env.NODE_ENV,
+    projectId: admin.apps[0]?.options?.projectId || 'not set'
+  });
+});
 
 // Health check endpoint with Glitch-specific info
 app.get("/health", async (req, res) => {
