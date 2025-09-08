@@ -13,6 +13,56 @@ try {
   console.warn('Upload handler not available. Install multer and cloudinary for file upload functionality.');
 }
 
+// DEBUG route to check database contents directly
+router.get('/debug/database', verifyToken, async (req, res) => {
+  try {
+    console.log('🐛 DEBUG: Checking database contents...');
+
+    // Count all documents
+    const totalDocs = await Sermon.countDocuments();
+    console.log(`🐛 Total documents in collection: ${totalDocs}`);
+
+    // Get all documents with basic info
+    const allSermons = await Sermon.find({}, 'title status isActive uploadedBy createdAt').lean();
+    console.log(`🐛 All sermons in DB:`, allSermons.map(s => ({
+      id: s._id.toString(),
+      title: s.title,
+      status: s.status,
+      isActive: s.isActive,
+      uploadedBy: s.uploadedBy,
+      createdAt: s.createdAt
+    })));
+
+    // Test the exact query being used
+    const adminQuery = { isActive: true };
+    const adminCount = await Sermon.countDocuments(adminQuery);
+    const adminResults = await Sermon.find(adminQuery, 'title status isActive').lean();
+
+    console.log(`🐛 Admin query {isActive: true} count: ${adminCount}`);
+    console.log(`🐛 Admin query results:`, adminResults);
+
+    res.json({
+      success: true,
+      debug: {
+        totalDocuments: totalDocs,
+        allSermons: allSermons,
+        adminQueryCount: adminCount,
+        adminQueryResults: adminResults,
+        userInfo: {
+          id: req.user?.id,
+          role: req.user?.role
+        }
+      }
+    });
+  } catch (error) {
+    console.error('🐛 DEBUG route error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // GET all sermons (public endpoint with optional auth)
 router.get('/', optionalAuth, async (req, res) => {
   try {
