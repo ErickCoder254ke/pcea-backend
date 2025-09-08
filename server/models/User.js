@@ -70,6 +70,20 @@ const userSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  // Legacy FCM token field for backward compatibility
+  fcmToken: {
+    type: String,
+    default: null
+  },
+  fcmTokenPlatform: {
+    type: String,
+    enum: ["web", "native", "android", "ios"],
+    default: "web",
+  },
+  fcmTokenUpdated: {
+    type: Date,
+    default: Date.now
+  },
   lastLogin: {
     type: Date,
     default: Date.now
@@ -143,6 +157,8 @@ userSchema.index({ email: 1 });
 userSchema.index({ fellowshipZone: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ role: 1 });
+userSchema.index({ fcmToken: 1 });
+userSchema.index({ currentPartner: 1 });
 
 // Pre-save middleware to handle phone formatting
 userSchema.pre('save', function(next) {
