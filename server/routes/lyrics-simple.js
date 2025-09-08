@@ -223,6 +223,86 @@ router.get('/admin', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/lyrics-simple/stats - Get statistics (MUST be before /:id route)
+router.get('/stats', verifyToken, async (req, res) => {
+  try {
+    const totalSongs = await SimpleSong.countDocuments();
+    const publishedSongs = await SimpleSong.countDocuments({ status: 'published' });
+    const draftSongs = await SimpleSong.countDocuments({ status: 'draft' });
+    const featuredSongs = await SimpleSong.countDocuments({ featured: true });
+
+    // Category breakdown
+    const categories = await SimpleSong.aggregate([
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalSongs,
+          publishedSongs,
+          draftSongs,
+          featuredSongs
+        },
+        categories
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch statistics',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/lyrics-simple/:id/publish - Publish song (MUST be before /:id route)
+router.post('/:id/publish', verifyToken, async (req, res) => {
+  try {
+    const song = await SimpleSong.findById(req.params.id);
+
+    if (!song) {
+      return res.status(404).json({
+        success: false,
+        message: 'Song not found'
+      });
+    }
+
+    song.status = 'published';
+    song.updatedBy = req.user.id;
+    song.updatedAt = new Date();
+
+    await song.save();
+
+    const publishedSong = await SimpleSong.findById(song._id)
+      .populate('createdBy', 'name')
+      .populate('updatedBy', 'name');
+
+    res.json({
+      success: true,
+      message: 'Song published successfully',
+      data: publishedSong
+    });
+  } catch (error) {
+    console.error('Error publishing song:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to publish song',
+      error: error.message
+    });
+  }
+});
+
 // GET /api/lyrics-simple/:id - Get single song
 router.get('/:id', async (req, res) => {
   try {
@@ -478,81 +558,93 @@ router.delete('/:id', verifyToken, async (req, res) => {
   }
 });
 
-// POST /api/lyrics-simple/:id/publish - Publish song
-router.post('/:id/publish', verifyToken, async (req, res) => {
+
+// TEST ENDPOINT - Create sample song for debugging (remove in production)
+router.post('/test/create-sample', verifyToken, async (req, res) => {
   try {
-    const song = await SimpleSong.findById(req.params.id);
+    console.log('🧪 Creating sample song for testing...');
 
-    if (!song) {
-      return res.status(404).json({
-        success: false,
-        message: 'Song not found'
-      });
-    }
+    const sampleSong = new SimpleSong({
+      title: 'Test Song ' + new Date().getTime(),
+      artist: 'Test Artist',
+      category: 'contemporary',
+      theme: 'worship',
+      season: 'general',
+      keySignature: 'C Major',
+      tempo: 'medium',
+      lyrics: [
+        {
+          type: 'verse',
+          label: 'Verse 1',
+          text: 'This is a test song\nCreated for debugging\nIt should appear in the system',
+          order: 1
+        },
+        {
+          type: 'chorus',
+          label: 'Chorus',
+          text: 'Test song, test song\nEverything works fine\nTest song, test song\nIn perfect time',
+          order: 2
+        }
+      ],
+      tags: ['test', 'sample', 'debug'],
+      chords: ['C', 'Am', 'F', 'G'],
+      language: 'english',
+      status: 'published',
+      featured: false,
+      createdBy: req.user.id,
+      updatedBy: req.user.id
+    });
 
-    song.status = 'published';
-    song.updatedBy = req.user.id;
-    song.updatedAt = new Date();
+    await sampleSong.save();
+    console.log('✅ Sample song created successfully:', sampleSong._id);
 
-    await song.save();
-
-    const publishedSong = await SimpleSong.findById(song._id)
+    const populatedSong = await SimpleSong.findById(sampleSong._id)
       .populate('createdBy', 'name')
       .populate('updatedBy', 'name');
 
     res.json({
       success: true,
-      message: 'Song published successfully',
-      data: publishedSong
+      message: 'Sample song created successfully',
+      data: populatedSong
     });
   } catch (error) {
-    console.error('Error publishing song:', error);
+    console.error('❌ Error creating sample song:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to publish song',
+      message: 'Failed to create sample song',
       error: error.message
     });
   }
 });
 
-// GET /api/lyrics-simple/stats - Get statistics
-router.get('/stats', verifyToken, async (req, res) => {
+// TEST ENDPOINT - Get debug info (remove in production)
+router.get('/test/debug', async (req, res) => {
   try {
     const totalSongs = await SimpleSong.countDocuments();
     const publishedSongs = await SimpleSong.countDocuments({ status: 'published' });
     const draftSongs = await SimpleSong.countDocuments({ status: 'draft' });
-    const featuredSongs = await SimpleSong.countDocuments({ featured: true });
 
-    // Category breakdown
-    const categories = await SimpleSong.aggregate([
-      {
-        $group: {
-          _id: '$category',
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
-    ]);
+    const sampleSongs = await SimpleSong.find().limit(3).select('title artist status createdAt');
 
     res.json({
       success: true,
-      data: {
-        overview: {
-          totalSongs,
-          publishedSongs,
-          draftSongs,
-          featuredSongs
+      debug: {
+        modelName: 'SimpleSong',
+        mongoConnection: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        counts: {
+          total: totalSongs,
+          published: publishedSongs,
+          draft: draftSongs
         },
-        categories
+        sampleSongs,
+        timestamp: new Date().toISOString()
       }
     });
   } catch (error) {
-    console.error('Error fetching stats:', error);
+    console.error('❌ Error in debug endpoint:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch statistics',
+      message: 'Debug endpoint failed',
       error: error.message
     });
   }
