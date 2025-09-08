@@ -129,27 +129,42 @@ const Notification = mongoose.model("Notification", notificationSchema);
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/pcea-turi-church';
-    
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+
+    if (!mongoUri) {
+      console.error('❌ MongoDB URI not found in environment variables');
+      console.error('   Please set MONGO_URI or MONGODB_URI environment variable');
+      console.error('   Expected format: mongodb://username:password@host:port/database');
+      process.exit(1);
+    }
+
+    // Log the connection attempt (without exposing credentials)
+    const safeUri = mongoUri.replace(/\/\/[^@]+@/, '//***:***@');
+    console.log(`🔄 Connecting to MongoDB: ${safeUri}`);
+
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    
+
     console.log('✅ Connected to MongoDB');
     console.log(`📂 Database: ${mongoose.connection.name}`);
-    
+
     // Handle connection errors after initial connection
     mongoose.connection.on('error', (err) => {
       console.error('❌ MongoDB connection error:', err);
     });
-    
+
     mongoose.connection.on('disconnected', () => {
       console.warn('⚠️ MongoDB disconnected');
     });
-    
+
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error);
+    console.error('🔍 Debug info:');
+    console.error(`   NODE_ENV: ${process.env.NODE_ENV}`);
+    console.error(`   Has MONGO_URI: ${!!process.env.MONGO_URI}`);
+    console.error(`   Has MONGODB_URI: ${!!process.env.MONGODB_URI}`);
     process.exit(1);
   }
 };
@@ -657,7 +672,7 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 PCEA Turi Church Backend Server running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`�� Health check: http://localhost:${PORT}/health`);
   console.log(`📡 API status: http://localhost:${PORT}/api/status`);
   
   // Log available routes
