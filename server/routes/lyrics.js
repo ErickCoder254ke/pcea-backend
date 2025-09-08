@@ -132,9 +132,17 @@ router.get('/:id', async (req, res) => {
 // POST /api/lyrics - Create new song (Admin only)
 router.post('/', verifyToken, async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const songData = {
       ...req.body,
-      createdBy: req.userId
+      createdBy: req.user.id
     };
 
     // Validate required fields
@@ -183,6 +191,14 @@ router.post('/', verifyToken, async (req, res) => {
 // PUT /api/lyrics/:id - Update song (Admin only)
 router.put('/:id', verifyToken, async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const song = await Song.findById(req.params.id);
 
     if (!song) {
@@ -194,7 +210,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 
     // Update song data
     Object.assign(song, req.body);
-    song.updatedBy = req.userId;
+    song.updatedBy = req.user.id;
 
     await song.save();
 
@@ -221,6 +237,14 @@ router.put('/:id', verifyToken, async (req, res) => {
 // DELETE /api/lyrics/:id - Delete song (Admin only)
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const song = await Song.findById(req.params.id);
 
     if (!song) {
@@ -232,7 +256,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
 
     // Soft delete by setting isActive to false
     song.metadata.isActive = false;
-    song.updatedBy = req.userId;
+    song.updatedBy = req.user.id;
     await song.save();
 
     res.json({
@@ -252,6 +276,14 @@ router.delete('/:id', verifyToken, async (req, res) => {
 // POST /api/lyrics/:id/publish - Publish song (Admin only)
 router.post('/:id/publish', verifyToken, async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const song = await Song.findById(req.params.id);
 
     if (!song) {
@@ -261,7 +293,7 @@ router.post('/:id/publish', verifyToken, async (req, res) => {
       });
     }
 
-    await song.publish(req.userId);
+    await song.publish(req.user.id);
 
     const publishedSong = await Song.findById(song._id)
       .populate('createdBy', 'name email')
@@ -285,6 +317,14 @@ router.post('/:id/publish', verifyToken, async (req, res) => {
 // POST /api/lyrics/:id/archive - Archive song (Admin only)
 router.post('/:id/archive', verifyToken, async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const song = await Song.findById(req.params.id);
 
     if (!song) {
@@ -295,7 +335,7 @@ router.post('/:id/archive', verifyToken, async (req, res) => {
     }
 
     await song.archive();
-    song.updatedBy = req.userId;
+    song.updatedBy = req.user.id;
     await song.save();
 
     res.json({
@@ -351,6 +391,14 @@ router.post('/:id/favorite', async (req, res) => {
 // POST /api/lyrics/:id/usage - Record song usage (Admin only)
 router.post('/:id/usage', verifyToken, async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const song = await Song.findById(req.params.id);
 
     if (!song) {
@@ -441,6 +489,14 @@ router.get('/practice-list', async (req, res) => {
 // POST /api/lyrics/:id/practice-list - Add/Remove from practice list (Admin only)
 router.post('/:id/practice-list', verifyToken, async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const { action, week, priority, notes } = req.body;
     const song = await Song.findById(req.params.id);
 
@@ -554,6 +610,14 @@ router.get('/stats', verifyToken, async (req, res) => {
 // POST /api/lyrics/:id/chords - Upload chord chart (Admin only)
 router.post('/:id/chords', verifyToken, async (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const { publicId, url, format, size } = req.body;
     const song = await Song.findById(req.params.id);
 
@@ -570,7 +634,7 @@ router.post('/:id/chords', verifyToken, async (req, res) => {
       format,
       size
     };
-    song.updatedBy = req.userId;
+    song.updatedBy = req.user.id;
     await song.save();
 
     res.json({
