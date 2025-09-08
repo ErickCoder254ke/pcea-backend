@@ -187,6 +187,7 @@ const meditationRoutes = require('./server/routes/meditation');
 const prayerPartnerRoutes = require('./server/routes/prayerPartners');
 const partnershipRequestRoutes = require('./server/routes/partnershipRequests');
 const prayerRequestRoutes = require('./server/routes/prayerRequests');
+const notificationRoutes = require('./server/routes/notifications');
 const userRoutes = require('./server/routes/profile');
 
 // Import upload handler if available
@@ -210,12 +211,22 @@ app.use('/api/meditation', meditationRoutes);
 app.use('/api/prayer-partners', prayerPartnerRoutes);
 app.use('/api/partnership-requests', partnershipRequestRoutes);
 app.use('/api/prayer-requests', prayerRequestRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/user', userRoutes);
 
 // Add upload routes if available
 if (uploadRoutes) {
   app.use('/api', uploadRoutes);
 }
+
+// Legacy route mounts for frontend compatibility
+app.use('/announcements', announcementRoutes);
+app.use('/events', eventRoutes);
+app.use('/gallery', galleryRoutes);
+app.use('/meditation', meditationRoutes);
+app.use('/ppartner', prayerPartnerRoutes);
+app.use('/partnership-requests', partnershipRequestRoutes);
+app.use('/prayer-requests', prayerRequestRoutes);
 
 // User Authentication Endpoints
 

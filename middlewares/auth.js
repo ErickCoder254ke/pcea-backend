@@ -189,9 +189,3 @@ module.exports = {
   optionalAuth,
   requireAdmin,
 };
-
-// Export verifyToken as default for backward compatibility
-module.exports = verifyToken;
-module.exports.verifyToken = verifyToken;
-module.exports.optionalAuth = optionalAuth;
-module.exports.requireAdmin = requireAdmin;
