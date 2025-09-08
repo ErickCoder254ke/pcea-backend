@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const verifyToken = require('../../middlewares/auth');
+const { verifyToken } = require('../../middlewares/auth');
 
 // Simplified Song Schema for easier creation
 const simpleSongSchema = new mongoose.Schema({

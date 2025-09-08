@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Song = require('../models/Song');
-const verifyToken = require('../../middlewares/auth');
+const { verifyToken } = require('../../middlewares/auth');
 
 // GET /api/lyrics - Get all published songs with optional filtering
 router.get('/', async (req, res) => {
