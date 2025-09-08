@@ -10,12 +10,28 @@ const multer = require('multer');
 const { v2: cloudinary } = require('cloudinary');
 const path = require('path');
 
-// Configure Cloudinary
+// Configure Cloudinary with enhanced error handling
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dw6646onz',
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true
 });
+
+// Log Cloudinary configuration status
+console.log('🔧 Cloudinary Backend Configuration:', {
+  cloudName: process.env.CLOUDINARY_CLOUD_NAME || 'dw6646onz',
+  hasApiKey: !!process.env.CLOUDINARY_API_KEY,
+  hasApiSecret: !!process.env.CLOUDINARY_API_SECRET,
+  environment: process.env.NODE_ENV || 'development'
+});
+
+// Check if Cloudinary is properly configured
+if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.warn('⚠️ Cloudinary API credentials not found in environment variables');
+  console.warn('⚠️ Server-side file uploads may not work properly');
+  console.warn('⚠️ Please set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in your .env file');
+}
 
 // Configure multer for memory storage (files will be uploaded to Cloudinary directly)
 const storage = multer.memoryStorage();
@@ -80,9 +96,15 @@ const uploadImage = multer({
   }
 });
 
-// Helper function to upload buffer to Cloudinary
+// Helper function to upload buffer to Cloudinary with enhanced error handling
 const uploadToCloudinary = (buffer, options = {}) => {
   return new Promise((resolve, reject) => {
+    // Check if Cloudinary is configured
+    if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      reject(new Error('Cloudinary API credentials not configured. Please check your environment variables.'));
+      return;
+    }
+
     const uploadOptions = {
       resource_type: options.resourceType || 'auto',
       folder: options.folder || 'pcea-turi-sermons',
@@ -90,15 +112,27 @@ const uploadToCloudinary = (buffer, options = {}) => {
       tags: options.tags || ['sermon', 'pcea-turi'],
       format: options.format,
       quality: options.quality || 'auto',
+      use_filename: options.useFilename || false,
+      unique_filename: options.uniqueFilename !== false,
+      overwrite: options.overwrite || false,
       ...options.cloudinaryOptions
     };
+
+    // Log upload attempt
+    console.log(`📤 Cloudinary upload starting:`, {
+      resourceType: uploadOptions.resource_type,
+      folder: uploadOptions.folder,
+      size: `${(buffer.length / 1024 / 1024).toFixed(2)}MB`
+    });
 
     const uploadStream = cloudinary.uploader.upload_stream(
       uploadOptions,
       (error, result) => {
         if (error) {
-          reject(error);
+          console.error('❌ Cloudinary upload failed:', error);
+          reject(new Error(`Cloudinary upload failed: ${error.message}`));
         } else {
+          console.log(`✅ Cloudinary upload successful: ${result.public_id}`);
           resolve(result);
         }
       }
@@ -174,7 +208,8 @@ router.post('/sermons/upload-video', verifyToken, uploadVideo.single('video'), a
   } catch (error) {
     console.error('Error uploading video:', error);
     
-    if (error.message.includes('File size too large')) {
+    // Enhanced error handling for common issues
+    if (error.message.includes('File size too large') || error.message.includes('413')) {
       return res.status(413).json({
         success: false,
         message: 'Video file is too large. Maximum size is 500MB.',
@@ -182,10 +217,26 @@ router.post('/sermons/upload-video', verifyToken, uploadVideo.single('video'), a
       });
     }
 
-    if (error.message.includes('Invalid file type')) {
+    if (error.message.includes('Invalid file type') || error.message.includes('format')) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid file type. Please upload a valid video file.',
+        message: 'Invalid file type. Please upload a valid video file (MP4, MOV, AVI, WebM).',
+        error: error.message
+      });
+    }
+
+    if (error.message.includes('Cloudinary API credentials')) {
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error. Please contact administrator.',
+        error: 'Upload service not properly configured'
+      });
+    }
+
+    if (error.message.includes('network') || error.message.includes('timeout')) {
+      return res.status(503).json({
+        success: false,
+        message: 'Upload service temporarily unavailable. Please try again later.',
         error: error.message
       });
     }
