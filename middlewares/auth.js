@@ -134,21 +134,53 @@ const optionalAuth = (req, res, next) => {
   }
 };
 
-// Middleware to check if user is admin (you can extend this based on your needs)
-const requireAdmin = (req, res, next) => {
+// Middleware to check if user is admin
+const requireAdmin = async (req, res, next) => {
   // First verify token
-  verifyToken(req, res, (err) => {
+  verifyToken(req, res, async (err) => {
     if (err) return; // verifyToken already sent response
 
-    // Add your admin check logic here
-    // For example, check if user has admin role in database
-    // For now, we'll just pass through - implement based on your requirements
+    try {
+      // Get User model
+      const User = require('../server/models/User');
 
-    if (process.env.NODE_ENV === "development") {
-      console.log(`🔐 Admin access granted to user: ${req.user.id}`);
+      // Find the user and check admin status
+      const user = await User.findById(req.user.id).select('role isAdmin');
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+          code: "USER_NOT_FOUND"
+        });
+      }
+
+      // Check if user is admin using the User model's method
+      if (!user.isAdminUser()) {
+        return res.status(403).json({
+          success: false,
+          message: "Admin access required. Insufficient permissions.",
+          code: "INSUFFICIENT_PERMISSIONS"
+        });
+      }
+
+      // Attach user info to request for further use
+      req.user.role = user.role;
+      req.user.isAdmin = user.isAdmin;
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(`🔐 Admin access granted to user: ${req.user.id} (role: ${user.role})`);
+      }
+
+      next();
+    } catch (error) {
+      console.error("❌ Error checking admin status:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error verifying admin permissions",
+        code: "ADMIN_CHECK_ERROR"
+      });
     }
-
-    next();
   });
 };
 

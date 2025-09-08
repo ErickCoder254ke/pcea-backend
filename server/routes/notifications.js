@@ -30,38 +30,8 @@ try {
   Notification = mongoose.model("Notification", notificationSchema);
 }
 
-// Authentication middleware (should be applied before these routes)
-const verifyToken = (req, res, next) => {
-  try {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Access denied. No token provided."
-      });
-    }
-
-    const jwt = require('jsonwebtoken');
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-      if (err) {
-        return res.status(403).json({
-          success: false,
-          message: "Invalid or expired token."
-        });
-      }
-      req.user = user;
-      next();
-    });
-  } catch (error) {
-    console.error("Token verification error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error"
-    });
-  }
-};
+// Import authentication middleware
+const { verifyToken, requireAdmin } = require('../../middlewares/auth');
 
 // GET /notifications - Get user notifications
 router.get('/', verifyToken, async (req, res) => {
@@ -214,7 +184,7 @@ router.post('/clear', verifyToken, async (req, res) => {
 });
 
 // POST /notifications/send - Admin route to send notifications to users
-router.post('/send', verifyToken, async (req, res) => {
+router.post('/send', requireAdmin, async (req, res) => {
   try {
     const { title, message, type = 'general', userIds, data = {} } = req.body;
 
@@ -303,7 +273,7 @@ router.delete('/:notificationId', verifyToken, async (req, res) => {
 });
 
 // GET /notifications/stats - Get notification statistics for admin
-router.get('/stats', verifyToken, async (req, res) => {
+router.get('/stats', requireAdmin, async (req, res) => {
   try {
     const totalNotifications = await Notification.countDocuments();
     const readNotifications = await Notification.countDocuments({ read: true });

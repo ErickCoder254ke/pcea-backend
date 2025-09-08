@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const PrayerRequest = require('../models/PrayerRequest');
 const User = require('../models/User');
+const { verifyToken, requireAdmin } = require('../../middlewares/auth');
 
 // Create a new prayer request
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const { title, description, category, urgency, anonymous, message } = req.body;
     const userId = req.user.id;
@@ -126,7 +127,7 @@ router.get('/public', async (req, res) => {
 });
 
 // Get user's own prayer requests
-router.get('/my-requests', async (req, res) => {
+router.get('/my-requests', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { status, page = 1, limit = 10 } = req.query;
@@ -183,7 +184,7 @@ router.get('/my-requests', async (req, res) => {
 });
 
 // Admin: Get all prayer requests for moderation
-router.get('/admin', async (req, res) => {
+router.get('/admin', requireAdmin, async (req, res) => {
   try {
     const { status, category, urgency, page = 1, limit = 20 } = req.query;
 
@@ -252,7 +253,7 @@ router.get('/admin', async (req, res) => {
 });
 
 // Admin: Get pending prayer requests
-router.get('/admin/pending', async (req, res) => {
+router.get('/admin/pending', requireAdmin, async (req, res) => {
   try {
     const pendingRequests = await PrayerRequest.find({ status: 'pending' })
       .populate('requesterId', 'name phone fellowshipZone')
@@ -286,7 +287,7 @@ router.get('/admin/pending', async (req, res) => {
 });
 
 // Admin: Approve a prayer request
-router.post('/:id/approve', async (req, res) => {
+router.post('/:id/approve', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const moderatorId = req.user.id;
@@ -336,7 +337,7 @@ router.post('/:id/approve', async (req, res) => {
 });
 
 // Admin: Reject a prayer request
-router.post('/:id/reject', async (req, res) => {
+router.post('/:id/reject', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -388,7 +389,7 @@ router.post('/:id/reject', async (req, res) => {
 });
 
 // Add prayer for a request (user interaction)
-router.post('/:id/pray', async (req, res) => {
+router.post('/:id/pray', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
