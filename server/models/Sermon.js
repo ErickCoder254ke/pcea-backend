@@ -10,16 +10,18 @@ const sermonSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    required: true,
+    required: false,
     trim: true,
-    maxlength: 2000
+    maxlength: 2000,
+    default: ''
   },
   speaker: {
     name: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
-      maxlength: 100
+      maxlength: 100,
+      default: ''
     },
     title: {
       type: String,
@@ -41,26 +43,29 @@ const sermonSchema = new mongoose.Schema({
   },
   date: {
     type: Date,
-    required: true,
-    index: true
+    required: false,
+    index: true,
+    default: null
   },
   duration: {
     type: Number, // Duration in minutes
-    required: true,
+    required: false,
     min: 1,
-    max: 300
+    max: 300,
+    default: null
   },
   category: {
     type: String,
-    required: true,
+    required: false,
     enum: ['Sunday Service', 'Bible Study', 'Youth Service', 'Special Event', 'Conference', 'Workshop', 'Prayer Meeting', 'Other'],
     default: 'Sunday Service'
   },
   topic: {
     type: String,
-    required: true,
+    required: false,
     trim: true,
-    maxlength: 200
+    maxlength: 200,
+    default: ''
   },
   series: {
     name: {

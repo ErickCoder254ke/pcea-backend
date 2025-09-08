@@ -297,7 +297,7 @@ router.post('/', verifyToken, async (req, res) => {
       metadata
     } = req.body;
 
-    // Validation
+    // Validation - only title is required for admin flexibility
     if (!title || !title.trim()) {
       return res.status(400).json({
         success: false,
@@ -305,55 +305,28 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    if (!description || !description.trim()) {
+    // Optional field validation - validate only if provided
+    if (duration && duration < 1) {
       return res.status(400).json({
         success: false,
-        message: 'Description is required'
+        message: 'Duration must be at least 1 minute if provided'
       });
     }
 
-    if (!speaker || !speaker.name || !speaker.name.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Speaker name is required'
-      });
-    }
-
-    if (!date) {
-      return res.status(400).json({
-        success: false,
-        message: 'Date is required'
-      });
-    }
-
-    if (!duration || duration < 1) {
-      return res.status(400).json({
-        success: false,
-        message: 'Duration is required and must be at least 1 minute'
-      });
-    }
-
-    if (!topic || !topic.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Topic is required'
-      });
-    }
-
-    // Create new sermon
+    // Create new sermon - handle optional fields gracefully
     const sermon = new Sermon({
       title: title.trim(),
-      description: description.trim(),
+      description: description?.trim() || '',
       speaker: {
-        name: speaker.name.trim(),
-        title: speaker.title?.trim() || '',
-        bio: speaker.bio?.trim() || '',
-        imageUrl: speaker.imageUrl?.trim() || ''
+        name: speaker?.name?.trim() || '',
+        title: speaker?.title?.trim() || '',
+        bio: speaker?.bio?.trim() || '',
+        imageUrl: speaker?.imageUrl?.trim() || ''
       },
-      date: new Date(date),
-      duration: parseInt(duration),
+      date: date ? new Date(date) : null,
+      duration: duration ? parseInt(duration) : null,
       category: category || 'Sunday Service',
-      topic: topic.trim(),
+      topic: topic?.trim() || '',
       series: {
         name: series?.name?.trim() || '',
         part: series?.part ? parseInt(series.part) : null,
