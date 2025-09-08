@@ -251,6 +251,7 @@ const videoRoutes = require("./server/routes/video");
 
 // Import models to ensure they're available
 const Song = require("./server/models/Song");
+const Announcement = require("./server/models/Announcement");
 const userRoutes = require("./server/routes/profile");
 
 // Firebase Debug endpoint to check configuration
