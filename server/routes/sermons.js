@@ -16,14 +16,14 @@ try {
 // GET all sermons (public endpoint with optional auth)
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const { 
-      category, 
+    const {
+      category,
       speaker,
       series,
       status = 'published',
-      featured, 
-      limit = 20, 
-      offset = 0, 
+      featured,
+      limit = 20,
+      offset = 0,
       search,
       sortBy = 'newest',
       tags,
@@ -31,14 +31,27 @@ router.get('/', optionalAuth, async (req, res) => {
       dateTo
     } = req.query;
 
+    console.log('🎥 GET /sermons request:', {
+      userAuthenticated: !!req.user,
+      userRole: req.user?.role || 'none',
+      statusParam: status,
+      limit,
+      offset,
+      hasSearch: !!search
+    });
+
     // Build query object
     let query = { isActive: true };
 
     // Only show published sermons for public access (unless user is authenticated admin)
     if (!req.user || req.user.role !== 'admin') {
       query.status = 'published';
+      console.log('🔒 Non-admin access: filtering to published sermons only');
     } else if (status && status !== 'all') {
       query.status = status;
+      console.log('🔑 Admin access: filtering by status =', status);
+    } else {
+      console.log('🔑 Admin access: showing all sermons (status=all)');
     }
 
     // Filter by category
@@ -115,18 +128,30 @@ router.get('/', optionalAuth, async (req, res) => {
       }
     }
 
+    console.log('🔍 Final query object:', JSON.stringify(query, null, 2));
+
     // Get total count for pagination
     const totalCount = await Sermon.countDocuments(query);
+    console.log('📊 Total documents matching query:', totalCount);
 
     // Apply pagination
     const startIndex = parseInt(offset) || 0;
     const limitNum = Math.min(parseInt(limit) || 20, 100); // Max 100 items per request
+
+    console.log('📄 Pagination:', { startIndex, limitNum });
 
     const sermons = await sermonQuery
       .skip(startIndex)
       .limit(limitNum)
       .populate('uploadedBy', 'name')
       .lean(); // Use lean() for better performance
+
+    console.log('📋 Retrieved sermons count:', sermons.length);
+
+    if (sermons.length > 0) {
+      console.log('📝 Sample sermon titles:', sermons.slice(0, 3).map(s => s.title));
+      console.log('📅 Sample sermon statuses:', sermons.slice(0, 3).map(s => s.status));
+    }
 
     // Transform data for frontend compatibility
     const transformedSermons = sermons.map(sermon => ({
