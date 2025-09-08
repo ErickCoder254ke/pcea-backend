@@ -31,28 +31,17 @@ router.get('/', optionalAuth, async (req, res) => {
       dateTo
     } = req.query;
 
-    console.log('🎥 GET /sermons request:', {
-      userAuthenticated: !!req.user,
-      userRole: req.user?.role || 'none',
-      statusParam: status,
-      limit,
-      offset,
-      hasSearch: !!search
-    });
-
     // Build query object
     let query = { isActive: true };
 
-    // Only show published sermons for public access (unless user is authenticated admin)
+    // Admin users can see all sermons, others only published
     if (!req.user || req.user.role !== 'admin') {
       query.status = 'published';
-      console.log('🔒 Non-admin access: filtering to published sermons only');
     } else if (status && status !== 'all') {
       query.status = status;
-      console.log('🔑 Admin access: filtering by status =', status);
-    } else {
-      console.log('🔑 Admin access: showing all sermons (status=all)');
     }
+
+    console.log(`🔍 Query: user=${req.user?.id}, role=${req.user?.role}, statusParam=${status}, finalQuery=${JSON.stringify(query)}`);
 
     // Filter by category
     if (category && category !== 'all' && category !== 'All') {
@@ -128,17 +117,12 @@ router.get('/', optionalAuth, async (req, res) => {
       }
     }
 
-    console.log('🔍 Final query object:', JSON.stringify(query, null, 2));
-
     // Get total count for pagination
     const totalCount = await Sermon.countDocuments(query);
-    console.log('📊 Total documents matching query:', totalCount);
 
     // Apply pagination
     const startIndex = parseInt(offset) || 0;
     const limitNum = Math.min(parseInt(limit) || 20, 100); // Max 100 items per request
-
-    console.log('📄 Pagination:', { startIndex, limitNum });
 
     const sermons = await sermonQuery
       .skip(startIndex)
@@ -146,12 +130,7 @@ router.get('/', optionalAuth, async (req, res) => {
       .populate('uploadedBy', 'name')
       .lean(); // Use lean() for better performance
 
-    console.log('📋 Retrieved sermons count:', sermons.length);
-
-    if (sermons.length > 0) {
-      console.log('📝 Sample sermon titles:', sermons.slice(0, 3).map(s => s.title));
-      console.log('📅 Sample sermon statuses:', sermons.slice(0, 3).map(s => s.status));
-    }
+    console.log(`📊 Query returned ${sermons.length} sermons out of ${totalCount} total`);
 
     // Transform data for frontend compatibility
     const transformedSermons = sermons.map(sermon => ({
@@ -368,11 +347,11 @@ router.post('/', verifyToken, async (req, res) => {
     });
 
     const savedSermon = await sermon.save();
-    
+
     // Populate uploadedBy for response
     await savedSermon.populate('uploadedBy', 'name');
 
-    console.log(`✅ New sermon created: "${savedSermon.title}" by ${req.user.id}`);
+    console.log(`✅ New sermon created: "${savedSermon.title}" (ID: ${savedSermon._id}) by ${req.user.id} with status: ${savedSermon.status}, isActive: ${savedSermon.isActive}`);
 
     res.status(201).json({
       success: true,
