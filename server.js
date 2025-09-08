@@ -2788,10 +2788,10 @@ app.use("/announcements", announcementsRouter);
 app.use("/meditation", meditationRouter);
 app.use("/gallery", galleryRouter);
 app.use("/ppartner", verifyToken, prayerPartnersRoute);
-app.use("/api", sermonRoutes);
-app.use("/api", lyricsRoutes);
-app.use("/api", videoRoutes);
-app.use("/api", userRoutes);
+app.use("/api/sermons", sermonRoutes);
+app.use("/api/lyrics", lyricsRoutes);
+app.use("/api/video", videoRoutes);
+app.use("/api/user", userRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
