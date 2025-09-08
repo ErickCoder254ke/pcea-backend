@@ -75,7 +75,7 @@ try {
   console.log(`🔥 Project ID: ${serviceAccount.project_id}`);
 } catch (error) {
   console.error("❌ Firebase Admin SDK initialization failed:", error.message);
-  console.error("🔍 Error details:", {
+  console.error("��� Error details:", {
     hasEnvVar: !!process.env.FIREBASE_SERVICE_ACCOUNT,
     nodeEnv: process.env.NODE_ENV,
     cwd: process.cwd(),
@@ -267,6 +267,26 @@ app.get("/firebase-debug", (req, res) => {
     envVarLength: process.env.FIREBASE_SERVICE_ACCOUNT?.length || 0,
     nodeEnv: process.env.NODE_ENV,
     projectId: admin.apps[0]?.options?.projectId || 'not set'
+  });
+});
+
+// API Routes test endpoint for debugging
+app.get("/api-test", (req, res) => {
+  res.json({
+    success: true,
+    message: "API routing test",
+    availableRoutes: {
+      "/api/sermons": "GET, POST (admin) - Sermon management",
+      "/api/lyrics": "GET, POST (admin) - Song/lyrics management",
+      "/api/lyrics/:id": "GET, PUT (admin), DELETE (admin) - Individual song operations",
+      "/api/lyrics/categories": "GET - Song categories",
+      "/api/lyrics/featured": "GET - Featured songs",
+      "/api/lyrics/popular": "GET - Popular songs",
+      "/api/lyrics/recent": "GET - Recent songs",
+      "/api/video": "GET, POST (admin) - Video management",
+      "/api/user": "Profile and user operations"
+    },
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -552,7 +572,7 @@ app.post("/api/user/update-fcm-token", verifyToken, async (req, res) => {
     });
 
     if (!updatedUser) {
-      console.error(`❌ User not found: ${req.user.id}`);
+      console.error(`�� User not found: ${req.user.id}`);
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -2764,7 +2784,7 @@ async function sendImmediatePairingNotifications(userId1, userId2) {
     await Promise.all(notificationPromises);
     console.log("📱 Immediate pairing notifications completed");
   } catch (error) {
-    console.error("❌ Error sending immediate pairing notifications:", error);
+    console.error("�� Error sending immediate pairing notifications:", error);
   }
 }
 

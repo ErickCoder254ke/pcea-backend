@@ -4,7 +4,7 @@ const Song = require('../models/Song');
 const verifyToken = require('../../middlewares/auth');
 
 // GET /api/lyrics - Get all published songs with optional filtering
-router.get('/lyrics', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const {
       category,
@@ -96,7 +96,7 @@ router.get('/lyrics', async (req, res) => {
 });
 
 // GET /api/lyrics/:id - Get single song by ID
-router.get('/lyrics/:id', async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const song = await Song.findById(req.params.id)
       .populate('createdBy', 'name email')
@@ -130,7 +130,7 @@ router.get('/lyrics/:id', async (req, res) => {
 });
 
 // POST /api/lyrics - Create new song (Admin only)
-router.post('/lyrics', verifyToken, async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const songData = {
       ...req.body,
@@ -181,7 +181,7 @@ router.post('/lyrics', verifyToken, async (req, res) => {
 });
 
 // PUT /api/lyrics/:id - Update song (Admin only)
-router.put('/lyrics/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, async (req, res) => {
   try {
     const song = await Song.findById(req.params.id);
 
@@ -219,7 +219,7 @@ router.put('/lyrics/:id', verifyToken, async (req, res) => {
 });
 
 // DELETE /api/lyrics/:id - Delete song (Admin only)
-router.delete('/lyrics/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, async (req, res) => {
   try {
     const song = await Song.findById(req.params.id);
 
@@ -250,7 +250,7 @@ router.delete('/lyrics/:id', verifyToken, async (req, res) => {
 });
 
 // POST /api/lyrics/:id/publish - Publish song (Admin only)
-router.post('/lyrics/:id/publish', verifyToken, async (req, res) => {
+router.post('/:id/publish', verifyToken, async (req, res) => {
   try {
     const song = await Song.findById(req.params.id);
 
@@ -283,7 +283,7 @@ router.post('/lyrics/:id/publish', verifyToken, async (req, res) => {
 });
 
 // POST /api/lyrics/:id/archive - Archive song (Admin only)
-router.post('/lyrics/:id/archive', verifyToken, async (req, res) => {
+router.post('/:id/archive', verifyToken, async (req, res) => {
   try {
     const song = await Song.findById(req.params.id);
 
@@ -313,7 +313,7 @@ router.post('/lyrics/:id/archive', verifyToken, async (req, res) => {
 });
 
 // POST /api/lyrics/:id/favorite - Toggle favorite (User action)
-router.post('/lyrics/:id/favorite', async (req, res) => {
+router.post('/:id/favorite', async (req, res) => {
   try {
     const { action } = req.body; // 'add' or 'remove'
     const song = await Song.findById(req.params.id);
@@ -349,7 +349,7 @@ router.post('/lyrics/:id/favorite', async (req, res) => {
 });
 
 // POST /api/lyrics/:id/usage - Record song usage (Admin only)
-router.post('/lyrics/:id/usage', verifyToken, async (req, res) => {
+router.post('/:id/usage', verifyToken, async (req, res) => {
   try {
     const song = await Song.findById(req.params.id);
 
@@ -439,7 +439,7 @@ router.get('/practice-list', async (req, res) => {
 });
 
 // POST /api/lyrics/:id/practice-list - Add/Remove from practice list (Admin only)
-router.post('/lyrics/:id/practice-list', verifyToken, async (req, res) => {
+router.post('/:id/practice-list', verifyToken, async (req, res) => {
   try {
     const { action, week, priority, notes } = req.body;
     const song = await Song.findById(req.params.id);
@@ -552,7 +552,7 @@ router.get('/stats', verifyToken, async (req, res) => {
 });
 
 // POST /api/lyrics/:id/chords - Upload chord chart (Admin only)
-router.post('/lyrics/:id/chords', verifyToken, async (req, res) => {
+router.post('/:id/chords', verifyToken, async (req, res) => {
   try {
     const { publicId, url, format, size } = req.body;
     const song = await Song.findById(req.params.id);
