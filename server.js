@@ -247,6 +247,7 @@ const galleryRouter = require("./server/routes/gallery");
 const prayerPartnersRoute = require("./server/routes/prayerPartners");
 const sermonRoutes = require("./server/routes/sermons");
 const lyricsRoutes = require("./server/routes/lyrics");
+const lyricsSimpleRoutes = require("./server/routes/lyrics-simple");
 const videoRoutes = require("./server/routes/video");
 
 // Import models to ensure they're available
@@ -277,12 +278,11 @@ app.get("/api-test", (req, res) => {
     message: "API routing test",
     availableRoutes: {
       "/api/sermons": "GET, POST (admin) - Sermon management",
-      "/api/lyrics": "GET, POST (admin) - Song/lyrics management",
-      "/api/lyrics/:id": "GET, PUT (admin), DELETE (admin) - Individual song operations",
-      "/api/lyrics/categories": "GET - Song categories",
-      "/api/lyrics/featured": "GET - Featured songs",
-      "/api/lyrics/popular": "GET - Popular songs",
-      "/api/lyrics/recent": "GET - Recent songs",
+      "/api/lyrics": "GET, POST (admin) - Song/lyrics management (complex)",
+      "/api/lyrics-simple": "GET, POST (admin) - Song/lyrics management (simplified)",
+      "/api/lyrics-simple/:id": "GET, PUT (admin), DELETE (admin) - Individual song operations",
+      "/api/lyrics-simple/admin": "GET (admin) - All songs for admin",
+      "/api/lyrics-simple/stats": "GET (admin) - Song statistics",
       "/api/video": "GET, POST (admin) - Video management",
       "/api/user": "Profile and user operations"
     },
@@ -572,7 +572,7 @@ app.post("/api/user/update-fcm-token", verifyToken, async (req, res) => {
     });
 
     if (!updatedUser) {
-      console.error(`�� User not found: ${req.user.id}`);
+      console.error(`❌ User not found: ${req.user.id}`);
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -2784,7 +2784,7 @@ async function sendImmediatePairingNotifications(userId1, userId2) {
     await Promise.all(notificationPromises);
     console.log("📱 Immediate pairing notifications completed");
   } catch (error) {
-    console.error("�� Error sending immediate pairing notifications:", error);
+    console.error("❌ Error sending immediate pairing notifications:", error);
   }
 }
 
@@ -2814,6 +2814,7 @@ app.use("/gallery", galleryRouter);
 app.use("/ppartner", verifyToken, prayerPartnersRoute);
 app.use("/api/sermons", sermonRoutes);
 app.use("/api/lyrics", lyricsRoutes);
+app.use("/api/lyrics-simple", lyricsSimpleRoutes);
 app.use("/api/video", videoRoutes);
 app.use("/api/user", userRoutes);
 
