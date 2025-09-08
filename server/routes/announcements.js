@@ -1,105 +1,75 @@
 const express = require('express');
 const router = express.Router();
-
-// In-memory storage for announcements (in production, this would be a database)
-let announcements = [
-  {
-    id: 'demo-1',
-    title: 'Youth Retreat Registration',
-    description: 'Join us for an amazing weekend of worship and fellowship. Registration closes this Friday!',
-    content: 'We are excited to announce our upcoming youth retreat! This will be a transformative weekend filled with worship, fellowship, and spiritual growth. The retreat will include exciting activities, inspiring messages, and opportunities to connect with fellow youth members. Registration is required and closes this Friday, so don\'t miss out on this incredible opportunity to grow in faith and community.',
-    date: '2024-12-15',
-    time: '6:00 PM',
-    category: 'Youth',
-    author: 'Youth Ministry',
-    location: 'Camp Galilee',
-    priority: 'high',
-    registrationRequired: true,
-    tags: ['retreat', 'youth', 'registration'],
-    contactInfo: 'youth@pceaturichurch.org',
-    status: 'published',
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'demo-2',
-    title: 'Fellowship Meeting',
-    description: 'Join us for our weekly fellowship dinner and faith sharing time.',
-    content: 'Every Wednesday, our church community comes together for a time of fellowship, sharing, and spiritual nourishment. This is a wonderful opportunity to connect with other members, share a meal, and grow in faith together. All are welcome to join us for this weekly gathering.',
-    date: 'Every Wednesday',
-    time: '6:30 PM',
-    category: 'Fellowship',
-    author: 'Fellowship Committee',
-    location: 'Church Hall',
-    priority: 'normal',
-    tags: ['fellowship', 'dinner', 'weekly'],
-    contactInfo: 'fellowship@pceaturichurch.org',
-    status: 'published',
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'demo-3',
-    title: 'Bible Study: Romans',
-    description: 'Deep dive into Paul\'s letter to the Romans with Pastor Johnson.',
-    content: 'Join Pastor Johnson for an in-depth study of Paul\'s letter to the Romans. This comprehensive study will explore the theological themes and practical applications of this foundational New Testament book. Perfect for both new believers and mature Christians looking to deepen their understanding of Scripture.',
-    date: 'Every Friday',
-    time: '7:00 PM',
-    category: 'Events',
-    author: 'Pastor Johnson',
-    location: 'Sanctuary',
-    priority: 'normal',
-    tags: ['bible study', 'teaching', 'romans'],
-    contactInfo: 'pastor@pceaturichurch.org',
-    status: 'published',
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
-
-// Helper function to generate unique ID
-const generateId = () => {
-  return 'ann-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-};
+const Announcement = require('../models/Announcement');
 
 // GET /announcements - Get all announcements
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const { status, category, priority, limit } = req.query;
+    const { status, category, priority, limit, search, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     
-    let filteredAnnouncements = [...announcements];
-
+    // Build query
+    let query = {};
+    
     // Filter by status
     if (status) {
-      filteredAnnouncements = filteredAnnouncements.filter(ann => ann.status === status);
+      if (status === 'all') {
+        // Don't filter by status
+      } else {
+        query.status = status;
+      }
+    } else {
+      // Default to published announcements for public access
+      query.status = 'published';
     }
 
     // Filter by category
-    if (category) {
-      filteredAnnouncements = filteredAnnouncements.filter(ann => ann.category === category);
+    if (category && category !== 'all') {
+      query.category = category;
     }
 
     // Filter by priority
-    if (priority) {
-      filteredAnnouncements = filteredAnnouncements.filter(ann => ann.priority === priority);
+    if (priority && priority !== 'all') {
+      query.priority = priority;
     }
 
-    // Limit results
-    if (limit) {
-      filteredAnnouncements = filteredAnnouncements.slice(0, parseInt(limit));
+    // Handle search
+    let announcements;
+    if (search) {
+      announcements = await Announcement.search(search, { 
+        status: query.status, 
+        limit: parseInt(limit) || 50 
+      });
+    } else {
+      // Build sort object
+      const sortObj = {};
+      sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      
+      // If sorting by priority, add secondary sort by date
+      if (sortBy === 'priority') {
+        sortObj.createdAt = -1;
+      }
+      
+      announcements = await Announcement.find(query)
+        .sort(sortObj)
+        .limit(parseInt(limit) || 50)
+        .lean();
     }
 
-    // Sort by creation date (newest first)
-    filteredAnnouncements.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    console.log(`✅ Retrieved ${announcements.length} announcements with filters:`, {
+      status: query.status,
+      category: query.category,
+      priority: query.priority,
+      search
+    });
 
     res.json({
       success: true,
       message: 'Announcements retrieved successfully',
-      data: filteredAnnouncements,
-      total: filteredAnnouncements.length
+      data: announcements,
+      total: announcements.length
     });
   } catch (error) {
-    console.error('Error fetching announcements:', error);
+    console.error('❌ Error fetching announcements:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve announcements',
@@ -109,45 +79,62 @@ router.get('/', (req, res) => {
 });
 
 // GET /announcements/admin/stats - Get announcement statistics for admin
-router.get('/admin/stats', (req, res) => {
+router.get('/admin/stats', async (req, res) => {
   try {
-    const total = announcements.length;
-    const published = announcements.filter(ann => ann.status === 'published').length;
-    const draft = announcements.filter(ann => ann.status === 'draft').length;
-    const scheduled = announcements.filter(ann => ann.status === 'scheduled').length;
-    const urgent = announcements.filter(ann => ann.priority === 'urgent').length;
-    const high = announcements.filter(ann => ann.priority === 'high').length;
+    const total = await Announcement.countDocuments();
+    const published = await Announcement.countDocuments({ status: 'published' });
+    const draft = await Announcement.countDocuments({ status: 'draft' });
+    const scheduled = await Announcement.countDocuments({ status: 'scheduled' });
+    const archived = await Announcement.countDocuments({ status: 'archived' });
+    const urgent = await Announcement.countDocuments({ priority: 'urgent' });
+    const high = await Announcement.countDocuments({ priority: 'high' });
 
-    const categoryBreakdown = announcements.reduce((acc, ann) => {
-      acc[ann.category] = (acc[ann.category] || 0) + 1;
-      return acc;
-    }, {});
+    // Category breakdown
+    const categoryBreakdown = await Announcement.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+
+    const categories = {};
+    categoryBreakdown.forEach(cat => {
+      categories[cat._id] = cat.count;
+    });
+
+    // Recent activity
+    const recentActivity = await Announcement.find()
+      .sort({ updatedAt: -1 })
+      .limit(5)
+      .select('_id title status updatedAt')
+      .lean();
+
+    const formattedActivity = recentActivity.map(ann => ({
+      id: ann._id,
+      title: ann.title,
+      status: ann.status,
+      updatedAt: ann.updatedAt
+    }));
+
+    const stats = {
+      overview: {
+        total,
+        published,
+        draft,
+        scheduled,
+        archived,
+        urgent,
+        high
+      },
+      categories,
+      recentActivity: formattedActivity
+    };
+
+    console.log('📊 Announcement stats retrieved:', stats.overview);
 
     res.json({
       success: true,
-      data: {
-        overview: {
-          total,
-          published,
-          draft,
-          scheduled,
-          urgent,
-          high
-        },
-        categories: categoryBreakdown,
-        recentActivity: announcements
-          .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-          .slice(0, 5)
-          .map(ann => ({
-            id: ann.id,
-            title: ann.title,
-            status: ann.status,
-            updatedAt: ann.updatedAt
-          }))
-      }
+      data: stats
     });
   } catch (error) {
-    console.error('Error fetching announcement stats:', error);
+    console.error('❌ Error fetching announcement stats:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve announcement statistics',
@@ -157,10 +144,10 @@ router.get('/admin/stats', (req, res) => {
 });
 
 // GET /announcements/:id - Get specific announcement
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const announcement = announcements.find(ann => ann.id === id);
+    const announcement = await Announcement.findById(id).lean();
 
     if (!announcement) {
       return res.status(404).json({
@@ -169,13 +156,27 @@ router.get('/:id', (req, res) => {
       });
     }
 
+    // Increment views for published announcements
+    if (announcement.status === 'published') {
+      await Announcement.findByIdAndUpdate(id, { $inc: { views: 1 } });
+    }
+
     res.json({
       success: true,
       message: 'Announcement retrieved successfully',
       data: announcement
     });
   } catch (error) {
-    console.error('Error fetching announcement:', error);
+    console.error('❌ Error fetching announcement:', error);
+    
+    // Handle invalid ObjectId
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid announcement ID format'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve announcement',
@@ -185,7 +186,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /announcements - Create new announcement
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const {
       title,
@@ -233,8 +234,8 @@ router.post('/', (req, res) => {
       });
     }
 
-    const newAnnouncement = {
-      id: generateId(),
+    // Create announcement object
+    const announcementData = {
       title: title.trim(),
       description: description.trim(),
       content: content ? content.trim() : description.trim(),
@@ -248,26 +249,38 @@ router.post('/', (req, res) => {
       registrationRequired,
       contactInfo: contactInfo ? contactInfo.trim() : '',
       status,
-      scheduledDate: scheduledDate || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : null
     };
 
-    announcements.push(newAnnouncement);
+    const newAnnouncement = new Announcement(announcementData);
+    const savedAnnouncement = await newAnnouncement.save();
 
-    // If it's urgent/high priority and published, you could trigger notifications here
+    console.log(`✅ Announcement created: "${title}" with status: ${status}`);
+
+    // If it's urgent/high priority and published, log for potential notifications
     if ((priority === 'urgent' || priority === 'high') && status === 'published') {
-      console.log(`🚨 High priority announcement created: "${title}"`);
+      console.log(`🚨 High priority announcement published: "${title}" - ID: ${savedAnnouncement._id}`);
       // TODO: Trigger push notifications
     }
 
     res.status(201).json({
       success: true,
       message: 'Announcement created successfully',
-      data: newAnnouncement
+      data: savedAnnouncement
     });
   } catch (error) {
-    console.error('Error creating announcement:', error);
+    console.error('❌ Error creating announcement:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: validationErrors
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to create announcement',
@@ -277,94 +290,59 @@ router.post('/', (req, res) => {
 });
 
 // PUT /announcements/:id - Update announcement
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const announcementIndex = announcements.findIndex(ann => ann.id === id);
+    const updateData = req.body;
 
-    if (announcementIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Announcement not found'
-      });
-    }
+    // Remove fields that shouldn't be updated directly
+    delete updateData._id;
+    delete updateData.createdAt;
+    delete updateData.views;
+    delete updateData.likes;
 
-    const {
-      title,
-      description,
-      content,
-      category,
-      priority,
-      author,
-      location,
-      time,
-      date,
-      tags,
-      registrationRequired,
-      contactInfo,
-      status,
-      scheduledDate
-    } = req.body;
-
-    // Validation
-    if (title && !title.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title cannot be empty'
-      });
-    }
-
-    if (description && !description.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Description cannot be empty'
-      });
-    }
-
-    if (priority && !['low', 'normal', 'high', 'urgent'].includes(priority)) {
+    // Validation for specific fields if provided
+    if (updateData.priority && !['low', 'normal', 'high', 'urgent'].includes(updateData.priority)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid priority level'
       });
     }
 
-    if (category && !['Events', 'Fellowship', 'Youth', 'Worship', 'Prayer'].includes(category)) {
+    if (updateData.category && !['Events', 'Fellowship', 'Youth', 'Worship', 'Prayer'].includes(updateData.category)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid category'
       });
     }
 
-    if (status && !['draft', 'published', 'scheduled'].includes(status)) {
+    if (updateData.status && !['draft', 'published', 'scheduled', 'archived'].includes(updateData.status)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid status'
       });
     }
 
-    const existingAnnouncement = announcements[announcementIndex];
-    
-    // Update announcement
-    const updatedAnnouncement = {
-      ...existingAnnouncement,
-      ...(title && { title: title.trim() }),
-      ...(description && { description: description.trim() }),
-      ...(content && { content: content.trim() }),
-      ...(category && { category }),
-      ...(priority && { priority }),
-      ...(author && { author: author.trim() }),
-      ...(location !== undefined && { location: location.trim() }),
-      ...(time !== undefined && { time }),
-      ...(date !== undefined && { date }),
-      ...(tags && { tags: Array.isArray(tags) ? tags.map(tag => tag.trim()).filter(Boolean) : [] }),
-      ...(registrationRequired !== undefined && { registrationRequired }),
-      ...(contactInfo !== undefined && { contactInfo: contactInfo.trim() }),
-      ...(status && { status }),
-      ...(scheduledDate !== undefined && { scheduledDate }),
-      updatedAt: new Date().toISOString()
-    };
+    // Handle scheduled date
+    if (updateData.scheduledDate) {
+      updateData.scheduledDate = new Date(updateData.scheduledDate);
+    }
 
-    announcements[announcementIndex] = updatedAnnouncement;
+    // Update announcement
+    const updatedAnnouncement = await Announcement.findByIdAndUpdate(
+      id,
+      { ...updateData, updatedAt: new Date() },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedAnnouncement) {
+      return res.status(404).json({
+        success: false,
+        message: 'Announcement not found'
+      });
+    }
+
+    console.log(`✅ Announcement updated: "${updatedAnnouncement.title}" - ID: ${id}`);
 
     res.json({
       success: true,
@@ -372,7 +350,26 @@ router.put('/:id', (req, res) => {
       data: updatedAnnouncement
     });
   } catch (error) {
-    console.error('Error updating announcement:', error);
+    console.error('❌ Error updating announcement:', error);
+    
+    // Handle invalid ObjectId
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid announcement ID format'
+      });
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: validationErrors
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to update announcement',
@@ -382,19 +379,20 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE /announcements/:id - Delete announcement
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const announcementIndex = announcements.findIndex(ann => ann.id === id);
+    
+    const deletedAnnouncement = await Announcement.findByIdAndDelete(id);
 
-    if (announcementIndex === -1) {
+    if (!deletedAnnouncement) {
       return res.status(404).json({
         success: false,
         message: 'Announcement not found'
       });
     }
 
-    const deletedAnnouncement = announcements.splice(announcementIndex, 1)[0];
+    console.log(`🗑️ Announcement deleted: "${deletedAnnouncement.title}" - ID: ${id}`);
 
     res.json({
       success: true,
@@ -402,7 +400,16 @@ router.delete('/:id', (req, res) => {
       data: deletedAnnouncement
     });
   } catch (error) {
-    console.error('Error deleting announcement:', error);
+    console.error('❌ Error deleting announcement:', error);
+    
+    // Handle invalid ObjectId
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid announcement ID format'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to delete announcement',
@@ -412,43 +419,59 @@ router.delete('/:id', (req, res) => {
 });
 
 // POST /announcements/:id/publish - Publish/unpublish announcement
-router.post('/:id/publish', (req, res) => {
+router.post('/:id/publish', async (req, res) => {
   try {
     const { id } = req.params;
     const { status = 'published' } = req.body;
 
-    const announcementIndex = announcements.findIndex(ann => ann.id === id);
-
-    if (announcementIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Announcement not found'
-      });
-    }
-
-    if (!['draft', 'published', 'scheduled'].includes(status)) {
+    if (!['draft', 'published', 'scheduled', 'archived'].includes(status)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid status'
       });
     }
 
-    announcements[announcementIndex].status = status;
-    announcements[announcementIndex].updatedAt = new Date().toISOString();
+    const updatedAnnouncement = await Announcement.findByIdAndUpdate(
+      id,
+      { 
+        status,
+        ...(status === 'published' && { publishedAt: new Date() }),
+        ...(status === 'archived' && { archivedAt: new Date() }),
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
 
-    // If publishing a high priority announcement, trigger notifications
-    if (status === 'published' && (announcements[announcementIndex].priority === 'urgent' || announcements[announcementIndex].priority === 'high')) {
-      console.log(`🚨 High priority announcement published: "${announcements[announcementIndex].title}"`);
+    if (!updatedAnnouncement) {
+      return res.status(404).json({
+        success: false,
+        message: 'Announcement not found'
+      });
+    }
+
+    // If publishing a high priority announcement, log for notifications
+    if (status === 'published' && (updatedAnnouncement.priority === 'urgent' || updatedAnnouncement.priority === 'high')) {
+      console.log(`🚨 High priority announcement published: "${updatedAnnouncement.title}" - ID: ${id}`);
       // TODO: Trigger push notifications
     }
+
+    console.log(`📝 Announcement status changed to "${status}": "${updatedAnnouncement.title}"`);
 
     res.json({
       success: true,
       message: `Announcement ${status} successfully`,
-      data: announcements[announcementIndex]
+      data: updatedAnnouncement
     });
   } catch (error) {
-    console.error('Error updating announcement status:', error);
+    console.error('❌ Error updating announcement status:', error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid announcement ID format'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to update announcement status',
@@ -458,19 +481,10 @@ router.post('/:id/publish', (req, res) => {
 });
 
 // POST /announcements/:id/schedule - Schedule announcement
-router.post('/:id/schedule', (req, res) => {
+router.post('/:id/schedule', async (req, res) => {
   try {
     const { id } = req.params;
     const { scheduledDate, scheduledTime } = req.body;
-
-    const announcementIndex = announcements.findIndex(ann => ann.id === id);
-
-    if (announcementIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Announcement not found'
-      });
-    }
 
     if (!scheduledDate || !scheduledTime) {
       return res.status(400).json({
@@ -488,17 +502,40 @@ router.post('/:id/schedule', (req, res) => {
       });
     }
 
-    announcements[announcementIndex].status = 'scheduled';
-    announcements[announcementIndex].scheduledDate = scheduledDateTime.toISOString();
-    announcements[announcementIndex].updatedAt = new Date().toISOString();
+    const updatedAnnouncement = await Announcement.findByIdAndUpdate(
+      id,
+      { 
+        status: 'scheduled',
+        scheduledDate: scheduledDateTime,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!updatedAnnouncement) {
+      return res.status(404).json({
+        success: false,
+        message: 'Announcement not found'
+      });
+    }
+
+    console.log(`⏰ Announcement scheduled: "${updatedAnnouncement.title}" for ${scheduledDateTime}`);
 
     res.json({
       success: true,
       message: 'Announcement scheduled successfully',
-      data: announcements[announcementIndex]
+      data: updatedAnnouncement
     });
   } catch (error) {
-    console.error('Error scheduling announcement:', error);
+    console.error('❌ Error scheduling announcement:', error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid announcement ID format'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to schedule announcement',
@@ -508,7 +545,7 @@ router.post('/:id/schedule', (req, res) => {
 });
 
 // POST /announcements/bulk-actions - Bulk operations
-router.post('/bulk-actions', (req, res) => {
+router.post('/bulk-actions', async (req, res) => {
   try {
     const { action, announcementIds } = req.body;
 
@@ -527,56 +564,97 @@ router.post('/bulk-actions', (req, res) => {
       });
     }
 
-    let updatedCount = 0;
-    let errors = [];
+    let result;
+    const timestamp = new Date();
 
-    announcementIds.forEach(id => {
-      const announcementIndex = announcements.findIndex(ann => ann.id === id);
-      
-      if (announcementIndex === -1) {
-        errors.push(`Announcement ${id} not found`);
-        return;
-      }
+    switch (action) {
+      case 'publish':
+        result = await Announcement.updateMany(
+          { _id: { $in: announcementIds } },
+          { 
+            status: 'published', 
+            publishedAt: timestamp,
+            updatedAt: timestamp 
+          }
+        );
+        break;
+      case 'unpublish':
+        result = await Announcement.updateMany(
+          { _id: { $in: announcementIds } },
+          { 
+            status: 'draft',
+            updatedAt: timestamp 
+          }
+        );
+        break;
+      case 'archive':
+        result = await Announcement.updateMany(
+          { _id: { $in: announcementIds } },
+          { 
+            status: 'archived',
+            archivedAt: timestamp,
+            updatedAt: timestamp 
+          }
+        );
+        break;
+      case 'delete':
+        result = await Announcement.deleteMany({ _id: { $in: announcementIds } });
+        break;
+    }
 
-      try {
-        switch (action) {
-          case 'publish':
-            announcements[announcementIndex].status = 'published';
-            announcements[announcementIndex].updatedAt = new Date().toISOString();
-            break;
-          case 'unpublish':
-            announcements[announcementIndex].status = 'draft';
-            announcements[announcementIndex].updatedAt = new Date().toISOString();
-            break;
-          case 'delete':
-            announcements.splice(announcementIndex, 1);
-            break;
-          case 'archive':
-            announcements[announcementIndex].status = 'archived';
-            announcements[announcementIndex].updatedAt = new Date().toISOString();
-            break;
-        }
-        updatedCount++;
-      } catch (error) {
-        errors.push(`Failed to ${action} announcement ${id}: ${error.message}`);
-      }
-    });
+    console.log(`📋 Bulk ${action} completed: ${result.modifiedCount || result.deletedCount} announcements affected`);
 
     res.json({
       success: true,
-      message: `Bulk ${action} completed`,
+      message: `Bulk ${action} completed successfully`,
       data: {
-        processed: announcementIds.length,
-        successful: updatedCount,
-        failed: errors.length,
-        errors
+        requested: announcementIds.length,
+        affected: result.modifiedCount || result.deletedCount || 0,
+        action
       }
     });
   } catch (error) {
-    console.error('Error performing bulk action:', error);
+    console.error('❌ Error performing bulk action:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to perform bulk action',
+      error: error.message
+    });
+  }
+});
+
+// GET /announcements/search/:term - Search announcements
+router.get('/search/:term', async (req, res) => {
+  try {
+    const { term } = req.params;
+    const { status = 'published', limit = 20 } = req.query;
+
+    if (!term || term.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search term must be at least 2 characters long'
+      });
+    }
+
+    const announcements = await Announcement.search(term.trim(), {
+      status,
+      limit: parseInt(limit)
+    });
+
+    console.log(`🔍 Search for "${term}" returned ${announcements.length} results`);
+
+    res.json({
+      success: true,
+      message: 'Search completed successfully',
+      data: announcements,
+      searchTerm: term,
+      total: announcements.length
+    });
+  } catch (error) {
+    console.error('❌ Error searching announcements:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search announcements',
       error: error.message
     });
   }

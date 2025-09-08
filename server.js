@@ -248,6 +248,9 @@ const prayerPartnersRoute = require("./server/routes/prayerPartners");
 const sermonRoutes = require("./server/routes/sermons");
 const lyricsRoutes = require("./server/routes/lyrics");
 const videoRoutes = require("./server/routes/video");
+
+// Import models to ensure they're available
+const Song = require("./server/models/Song");
 const userRoutes = require("./server/routes/profile");
 
 // Firebase Debug endpoint to check configuration
