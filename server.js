@@ -173,7 +173,6 @@ const prayerPartnerRoutes = require('./server/routes/prayerPartners');
 const partnershipRequestRoutes = require('./server/routes/partnershipRequests');
 const prayerRequestRoutes = require('./server/routes/prayerRequests');
 const userRoutes = require('./server/routes/profile');
-const notificationRoutes = require('./server/routes/notifications');
 
 // Import upload handler if available
 let uploadRoutes = null;
@@ -197,7 +196,6 @@ app.use('/api/prayer-partners', prayerPartnerRoutes);
 app.use('/api/partnership-requests', partnershipRequestRoutes);
 app.use('/api/prayer-requests', prayerRequestRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/notifications', notificationRoutes);
 
 // Add upload routes if available
 if (uploadRoutes) {
