@@ -33,11 +33,6 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Simplified validation helper functions for essential fields only
-const validatePhoneNumber = (phone) => {
-  const phoneRegex = /^\d{10}$/;
-  return phoneRegex.test(phone);
-};
-
 const validateEmail = (email) => {
   if (!email) return true; // Email is optional
   const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
@@ -86,15 +81,16 @@ router.get("/userinfo", authenticateToken, async (req, res) => {
 // Update user profile - simplified to handle only essential fields
 router.put("/userinfo", authenticateToken, async (req, res) => {
   try {
-    console.log(`📝 Profile update request from user ${req.user.id}:`, req.body);
+    console.log(`📝 Profile update request from user ${req.user.id}`);
 
     const {
       name,
-      phone,
       email,
       bio,
       profileImage
     } = req.body;
+
+    // Note: Phone number is not included - it's read-only during profile updates
 
     // Find the user
     const user = await User.findById(req.user.id);
@@ -112,20 +108,7 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
       errors.push("Name must be at least 2 characters long");
     }
 
-    if (phone !== undefined) {
-      if (!validatePhoneNumber(phone)) {
-        errors.push("Please provide a valid 10-digit phone number");
-      } else if (phone !== user.phone) {
-        // Only check uniqueness if phone number is actually being changed
-        const existingUser = await User.findOne({
-          phone,
-          _id: { $ne: req.user.id }
-        });
-        if (existingUser) {
-          errors.push("This phone number is already registered");
-        }
-      }
-    }
+    // Phone number validation removed - phone is read-only during profile updates
 
     if (email !== undefined && email && !validateEmail(email)) {
       errors.push("Please provide a valid email address");
@@ -152,10 +135,12 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
     const updateFields = {};
 
     if (name !== undefined) updateFields.name = name.trim();
-    if (phone !== undefined && phone !== user.phone) updateFields.phone = phone;
+    // Phone number updates removed - phone is read-only during profile updates
     if (email !== undefined) updateFields.email = email?.toLowerCase().trim() || null;
     if (bio !== undefined) updateFields.bio = bio?.trim() || null;
     if (profileImage !== undefined) updateFields.profileImage = profileImage?.trim() || null;
+
+    console.log(`📝 Update fields:`, updateFields);
 
     // Update the user
     const updatedUser = await User.findByIdAndUpdate(
