@@ -252,7 +252,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 });
 
 // POST /api/videos - Create new video (admin only)
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const {
       title,
@@ -367,7 +367,7 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 // PUT /api/videos/:id - Update video (admin only)
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/:id', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -447,7 +447,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 });
 
 // DELETE /api/videos/:id - Delete video (admin only) - Soft delete
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -565,7 +565,7 @@ router.post('/:id/share', optionalAuth, async (req, res) => {
 });
 
 // POST /api/videos/bulk - Bulk create videos (admin only)
-router.post('/bulk', verifyToken, async (req, res) => {
+router.post('/bulk', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { videos } = req.body;
 

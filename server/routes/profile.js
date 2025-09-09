@@ -113,8 +113,8 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
     if (phone !== undefined) {
       if (!validatePhoneNumber(phone)) {
         errors.push("Please provide a valid 10-digit phone number");
-      } else {
-        // Check if phone is already taken by another user
+      } else if (phone !== user.phone) {
+        // Only check uniqueness if phone number is actually being changed
         const existingUser = await User.findOne({
           phone,
           _id: { $ne: req.user.id }
@@ -149,7 +149,7 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
     const updateFields = {};
 
     if (name !== undefined) updateFields.name = name.trim();
-    if (phone !== undefined) updateFields.phone = phone;
+    if (phone !== undefined && phone !== user.phone) updateFields.phone = phone;
     if (email !== undefined) updateFields.email = email?.toLowerCase().trim() || null;
     if (bio !== undefined) updateFields.bio = bio?.trim() || null;
     if (profileImage !== undefined) updateFields.profileImage = profileImage?.trim() || null;
