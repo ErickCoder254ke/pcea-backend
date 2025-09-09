@@ -134,54 +134,58 @@ const optionalAuth = (req, res, next) => {
   }
 };
 
-// Middleware to check if user is admin
+// Middleware to check if user is admin (expects req.user to be set by verifyToken)
 const requireAdmin = async (req, res, next) => {
-  // First verify token
-  verifyToken(req, res, async (err) => {
-    if (err) return; // verifyToken already sent response
-
-    try {
-      // Get User model
-      const User = require('../server/models/User');
-
-      // Find the user and check admin status
-      const user = await User.findById(req.user.id).select('role isAdmin');
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-          code: "USER_NOT_FOUND"
-        });
-      }
-
-      // Check if user is admin using the User model's method
-      if (!user.isAdminUser()) {
-        return res.status(403).json({
-          success: false,
-          message: "Admin access required. Insufficient permissions.",
-          code: "INSUFFICIENT_PERMISSIONS"
-        });
-      }
-
-      // Attach user info to request for further use
-      req.user.role = user.role;
-      req.user.isAdmin = user.isAdmin;
-
-      if (process.env.NODE_ENV === "development") {
-        console.log(`🔐 Admin access granted to user: ${req.user.id} (role: ${user.role})`);
-      }
-
-      next();
-    } catch (error) {
-      console.error("❌ Error checking admin status:", error);
-      res.status(500).json({
+  try {
+    // Ensure user is authenticated first
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
         success: false,
-        message: "Error verifying admin permissions",
-        code: "ADMIN_CHECK_ERROR"
+        message: "Authentication required",
+        code: "AUTH_REQUIRED"
       });
     }
-  });
+
+    // Get User model
+    const User = require('../server/models/User');
+
+    // Find the user and check admin status
+    const user = await User.findById(req.user.id).select('role isAdmin');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        code: "USER_NOT_FOUND"
+      });
+    }
+
+    // Check if user is admin using the User model's method
+    if (!user.isAdminUser()) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin access required. Insufficient permissions.",
+        code: "INSUFFICIENT_PERMISSIONS"
+      });
+    }
+
+    // Attach user info to request for further use
+    req.user.role = user.role;
+    req.user.isAdmin = user.isAdmin;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`🔐 Admin access granted to user: ${req.user.id} (role: ${user.role})`);
+    }
+
+    next();
+  } catch (error) {
+    console.error("❌ Error checking admin status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error verifying admin permissions",
+      code: "ADMIN_CHECK_ERROR"
+    });
+  }
 };
 
 module.exports = {

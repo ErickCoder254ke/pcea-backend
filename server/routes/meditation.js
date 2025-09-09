@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { verifyToken } = require('../../middlewares/auth');
 
 // Mock data storage (in a real app, this would be a database)
 let meditations = [
@@ -45,21 +46,38 @@ const getWeekNumber = (date) => {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 };
 
-// Authentication middleware (simplified)
-const authenticateAdmin = (req, res, next) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    return res.status(401).json({
+
+// Root endpoint - Get all meditations (public, limited info)
+router.get('/', (req, res) => {
+  try {
+    const { limit = 10, status = 'active' } = req.query;
+
+    let filteredMeditations = [...meditations];
+
+    // Filter by status for public endpoint
+    if (status === 'active') {
+      filteredMeditations = filteredMeditations.filter(m => m.isActive);
+    }
+
+    // Sort by week descending (most recent first)
+    filteredMeditations.sort((a, b) => b.week.localeCompare(a.week));
+
+    // Limit results
+    const limitedMeditations = filteredMeditations.slice(0, parseInt(limit));
+
+    res.json({
+      success: true,
+      data: limitedMeditations,
+      total: filteredMeditations.length
+    });
+  } catch (error) {
+    console.error('Error fetching meditations:', error);
+    res.status(500).json({
       success: false,
-      message: 'Access denied. No token provided.'
+      message: 'Failed to fetch meditations'
     });
   }
-  
-  // In a real app, you would verify the JWT token here
-  // For now, we'll just check if a token exists
-  req.user = { id: 'admin', role: 'admin' };
-  next();
-};
+});
 
 // Public endpoint - Get current week's meditation
 router.get('/weekly', (req, res) => {
@@ -97,7 +115,7 @@ router.get('/weekly', (req, res) => {
 // Admin endpoints
 
 // Get all meditations (admin only)
-router.get('/admin', authenticateAdmin, (req, res) => {
+router.get('/admin', verifyToken, (req, res) => {
   try {
     const { page = 1, limit = 10, status = 'all', sortBy = 'week', order = 'desc' } = req.query;
     
@@ -151,7 +169,7 @@ router.get('/admin', authenticateAdmin, (req, res) => {
 });
 
 // Get meditation statistics (admin only)
-router.get('/admin/stats', authenticateAdmin, (req, res) => {
+router.get('/admin/stats', verifyToken, (req, res) => {
   try {
     const currentWeek = getCurrentWeek();
     const total = meditations.length;
@@ -192,8 +210,16 @@ router.get('/admin/stats', authenticateAdmin, (req, res) => {
 });
 
 // Create new meditation (admin only)
-router.post('/', authenticateAdmin, (req, res) => {
+router.post('/', verifyToken, (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const { week, scripture, reflection, prayer, isActive = true, scheduled = false, publishDate } = req.body;
     
     // Validation
@@ -246,7 +272,7 @@ router.post('/', authenticateAdmin, (req, res) => {
 });
 
 // Get specific meditation by ID (admin only)
-router.get('/:id', authenticateAdmin, (req, res) => {
+router.get('/:id', verifyToken, (req, res) => {
   try {
     const { id } = req.params;
     const meditation = meditations.find(m => m.id === parseInt(id));
@@ -272,8 +298,16 @@ router.get('/:id', authenticateAdmin, (req, res) => {
 });
 
 // Update meditation (admin only)
-router.put('/:id', authenticateAdmin, (req, res) => {
+router.put('/:id', verifyToken, (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const { id } = req.params;
     const { week, scripture, reflection, prayer, isActive, scheduled, publishDate } = req.body;
     
@@ -327,8 +361,16 @@ router.put('/:id', authenticateAdmin, (req, res) => {
 });
 
 // Delete meditation (admin only)
-router.delete('/:id', authenticateAdmin, (req, res) => {
+router.delete('/:id', verifyToken, (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const { id } = req.params;
     const meditationIndex = meditations.findIndex(m => m.id === parseInt(id));
     
@@ -356,8 +398,16 @@ router.delete('/:id', authenticateAdmin, (req, res) => {
 });
 
 // Schedule meditation for specific week (admin only)
-router.post('/:id/schedule', authenticateAdmin, (req, res) => {
+router.post('/:id/schedule', verifyToken, (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const { id } = req.params;
     const { publishDate, reminderSettings, weeklyRecurrence } = req.body;
     
@@ -395,7 +445,7 @@ router.post('/:id/schedule', authenticateAdmin, (req, res) => {
 });
 
 // Get meditation templates (admin only)
-router.get('/admin/templates', authenticateAdmin, (req, res) => {
+router.get('/admin/templates', verifyToken, (req, res) => {
   try {
     const templates = [
       {
@@ -441,8 +491,16 @@ router.get('/admin/templates', authenticateAdmin, (req, res) => {
 });
 
 // Bulk operations (admin only)
-router.post('/admin/bulk', authenticateAdmin, (req, res) => {
+router.post('/admin/bulk', verifyToken, (req, res) => {
   try {
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User authentication required'
+      });
+    }
+
     const { action, meditationIds, data } = req.body;
     
     if (!action || !meditationIds || !Array.isArray(meditationIds)) {

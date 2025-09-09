@@ -184,43 +184,113 @@ router.post('/clear', verifyToken, async (req, res) => {
 });
 
 // POST /notifications/send - Admin route to send notifications to users
-router.post('/send', requireAdmin, async (req, res) => {
+router.post('/send', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const { title, message, type = 'general', userIds, data = {} } = req.body;
+    // Import Firebase utility
+    const { sendPushNotifications, sendToAllUsers } = require('../../utils/firebaseUtils');
 
-    if (!title || !message) {
-      return res.status(400).json({
-        success: false,
-        message: "Title and message are required"
-      });
-    }
-
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "User IDs array is required"
-      });
-    }
-
-    // Create notifications for all specified users
-    const notifications = userIds.map(userId => ({
-      userId,
+    // Support both frontend formats
+    const {
       title,
       message,
+      body, // frontend sends 'body' instead of 'message'
+      type = 'general',
+      userIds,
+      targetUsers, // frontend sends 'targetUsers' instead of 'userIds'
+      priority = 'normal',
+      data = {}
+    } = req.body;
+
+    // Use body as message if message is not provided (for frontend compatibility)
+    const messageText = message || body;
+
+    if (!title || !messageText) {
+      return res.status(400).json({
+        success: false,
+        message: "Title and message/body are required"
+      });
+    }
+
+    // Handle both userIds and targetUsers, or send to all users if neither specified
+    let targetUserIds = userIds || targetUsers;
+    let sendToAll = false;
+
+    if (!targetUserIds || !Array.isArray(targetUserIds) || targetUserIds.length === 0) {
+      sendToAll = true;
+      // Get all users with FCM tokens for database storage
+      const User = require('../models/User');
+      const allUsers = await User.find({
+        fcmToken: { $ne: null, $exists: true },
+        isActive: { $ne: false }
+      }).select('_id');
+
+      targetUserIds = allUsers.map(user => user._id.toString());
+
+      if (targetUserIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No users found with notification tokens"
+        });
+      }
+    }
+
+    // Prepare notification data for FCM
+    const notificationData = {
       type,
-      data,
+      priority,
+      timestamp: new Date().toISOString(),
+      ...data
+    };
+
+    // Send FCM push notifications
+    let fcmResult;
+    if (sendToAll) {
+      fcmResult = await sendToAllUsers(title, messageText, notificationData);
+    } else {
+      fcmResult = await sendPushNotifications(targetUserIds, title, messageText, notificationData);
+    }
+
+    // Create notifications in database (for notification history)
+    const notifications = targetUserIds.map(userId => ({
+      userId,
+      title,
+      message: messageText,
+      type,
+      data: notificationData,
       createdAt: new Date(),
       receivedAt: new Date()
     }));
 
     const createdNotifications = await Notification.insertMany(notifications);
 
-    console.log(`📤 Sent ${createdNotifications.length} notifications: "${title}"`);
+    console.log(`📤 Database notifications created: ${createdNotifications.length}`);
+    console.log(`📱 FCM push notifications: ${fcmResult.success ? 'Success' : 'Failed'}`);
+
+    // Combine stats from database and FCM
+    const combinedStats = {
+      databaseCount: createdNotifications.length,
+      pushNotifications: fcmResult.stats,
+      fcmSuccess: fcmResult.success
+    };
 
     res.json({
       success: true,
-      message: "Notifications sent successfully",
+      message: fcmResult.success
+        ? `Notifications sent successfully! Database: ${createdNotifications.length}, Push: ${fcmResult.stats.successCount}/${fcmResult.stats.totalTargets}`
+        : `Database notifications saved (${createdNotifications.length}), but push notifications failed: ${fcmResult.message}`,
       sentCount: createdNotifications.length,
+      stats: {
+        successCount: fcmResult.stats.successCount || 0,
+        totalTargets: Math.max(targetUserIds.length, fcmResult.stats.totalTargets || 0),
+        databaseStored: createdNotifications.length,
+        pushDelivered: fcmResult.stats.successCount || 0,
+        pushFailed: fcmResult.stats.failureCount || 0
+      },
+      fcm: {
+        success: fcmResult.success,
+        message: fcmResult.message,
+        stats: fcmResult.stats
+      },
       notifications: createdNotifications.map(n => ({
         id: n._id,
         userId: n.userId,
@@ -273,7 +343,7 @@ router.delete('/:notificationId', verifyToken, async (req, res) => {
 });
 
 // GET /notifications/stats - Get notification statistics for admin
-router.get('/stats', requireAdmin, async (req, res) => {
+router.get('/stats', verifyToken, requireAdmin, async (req, res) => {
   try {
     const totalNotifications = await Notification.countDocuments();
     const readNotifications = await Notification.countDocuments({ read: true });
