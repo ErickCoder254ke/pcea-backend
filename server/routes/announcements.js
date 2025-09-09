@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Announcement = require('../models/Announcement');
 const { verifyToken, requireAdmin } = require('../../middlewares/auth');
+const { requireAdminAccess } = require('../../middlewares/flexible-auth');
 
 // GET /announcements - Get all announcements
 router.get('/', async (req, res) => {
@@ -81,7 +82,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /announcements/admin/stats - Get announcement statistics for admin
-router.get('/admin/stats', requireAdmin, async (req, res) => {
+router.get('/admin/stats', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const total = await Announcement.countDocuments();
     const published = await Announcement.countDocuments({ status: 'published' });
