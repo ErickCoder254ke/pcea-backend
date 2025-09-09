@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Video = require('../models/Video');
 const { verifyToken, optionalAuth, requireAdmin } = require('../../middlewares/auth');
+const { requireAdminAccess } = require('../../middlewares/flexible-auth');
 
 // Import upload handler for file uploads
 let uploadHandler = null;
@@ -158,7 +159,7 @@ router.get('/featured', async (req, res) => {
 });
 
 // GET /api/videos/stats - Get video statistics (admin only)
-router.get('/admin/stats', requireAdmin, async (req, res) => {
+router.get('/admin/stats', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     console.log('📊 Fetching video statistics...');
 
