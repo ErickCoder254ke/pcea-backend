@@ -40,11 +40,33 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Simplified validation helper functions for essential fields only
+// Validation helper functions
+const normalizePhoneNumber = (phone) => {
+  if (!phone) return phone;
+  // Remove all non-digit characters and ensure it's a string
+  return phone.toString().replace(/\D/g, '');
+};
+
+const validatePhoneNumber = (phone) => {
+  const normalizedPhone = normalizePhoneNumber(phone);
+  const phoneRegex = /^\d{10}$/;
+  return phoneRegex.test(normalizedPhone);
+};
+
 const validateEmail = (email) => {
   if (!email) return true; // Email is optional
   const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
   return emailRegex.test(email);
+};
+
+const generateEmailFromName = (name) => {
+  if (!name) return null;
+  // Convert name to email format: "John Doe" -> "john.doe@pceachurch.com"
+  const emailPrefix = name.toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+    .replace(/\s+/g, '.'); // Replace spaces with dots
+  return `${emailPrefix}@pceachurch.com`;
 };
 
 // Get user info - returns all stored data for display purposes
@@ -95,14 +117,15 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
 
     const {
       name,
+      phone,
       email,
       bio,
       profileImage
     } = req.body;
 
-    console.log(`📝 Extracted fields: name="${name}", email="${email}", bio="${bio}", profileImage="${profileImage}"`);
+    console.log(`📝 Extracted fields: name="${name}", phone="${phone}", email="${email}", bio="${bio}", profileImage="${profileImage}"`);
 
-    // Note: Phone number is not included - it's read-only during profile updates
+    // Note: Phone number editing is now re-enabled
 
     // Find the user
     const user = await User.findById(req.user.id);
@@ -120,7 +143,32 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
       errors.push("Name must be at least 2 characters long");
     }
 
-    // Phone number validation removed - phone is read-only during profile updates
+    // Phone number validation
+    if (phone !== undefined) {
+      const normalizedRequestPhone = normalizePhoneNumber(phone);
+      const normalizedCurrentPhone = normalizePhoneNumber(user.phone);
+
+      console.log(`📞 Phone validation - Request: "${phone}" -> "${normalizedRequestPhone}", Current: "${user.phone}" -> "${normalizedCurrentPhone}"`);
+
+      if (!validatePhoneNumber(phone)) {
+        errors.push("Please provide a valid 10-digit phone number");
+      } else if (normalizedRequestPhone !== normalizedCurrentPhone) {
+        console.log(`📞 Checking phone uniqueness for: "${normalizedRequestPhone}"`);
+        // Only check uniqueness if phone number is actually being changed
+        const existingUser = await User.findOne({
+          phone: normalizedRequestPhone,
+          _id: { $ne: req.user.id }
+        });
+        if (existingUser) {
+          console.log(`❌ Phone "${normalizedRequestPhone}" already exists for user: ${existingUser._id}`);
+          errors.push("This phone number is already registered");
+        } else {
+          console.log(`✅ Phone "${normalizedRequestPhone}" is available`);
+        }
+      } else {
+        console.log(`📞 Phone number unchanged, skipping uniqueness check`);
+      }
+    }
 
     if (email !== undefined && email && !validateEmail(email)) {
       errors.push("Please provide a valid email address");
@@ -147,8 +195,37 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
     const updateFields = {};
 
     if (name !== undefined) updateFields.name = name.trim();
-    // Phone number updates removed - phone is read-only during profile updates
-    if (email !== undefined) updateFields.email = email?.toLowerCase().trim() || null;
+
+    // Phone number updates (now re-enabled)
+    if (phone !== undefined) {
+      const normalizedRequestPhone = normalizePhoneNumber(phone);
+      const normalizedCurrentPhone = normalizePhoneNumber(user.phone);
+
+      if (normalizedRequestPhone !== normalizedCurrentPhone) {
+        console.log(`📞 Including phone in update: "${phone}" -> "${normalizedRequestPhone}"`);
+        updateFields.phone = normalizedRequestPhone;
+      } else {
+        console.log(`📞 Skipping phone update - same as current`);
+      }
+    }
+
+    // Email handling with automatic generation
+    if (email !== undefined) {
+      if (email && email.trim()) {
+        // User provided a valid email
+        updateFields.email = email.toLowerCase().trim();
+        console.log(`📧 Setting custom email: ${updateFields.email}`);
+      } else if (!user.email) {
+        // User has no email and didn't provide one - generate one
+        const generatedEmail = generateEmailFromName(updateFields.name || user.name);
+        if (generatedEmail) {
+          updateFields.email = generatedEmail;
+          console.log(`📧 Generated email for user: ${generatedEmail}`);
+        }
+      }
+      // If user has existing email and submits empty, keep existing email (don't update)
+    }
+
     if (bio !== undefined) updateFields.bio = bio?.trim() || null;
     if (profileImage !== undefined) updateFields.profileImage = profileImage?.trim() || null;
 
