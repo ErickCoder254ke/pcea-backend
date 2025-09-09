@@ -64,12 +64,109 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'
   });
+});
+
+// Test notification endpoint (proxy to notifications/test for frontend compatibility)
+app.get('/api/test-notification', async (req, res) => {
+  try {
+    // Import notification model
+    const mongoose = require('mongoose');
+    let Notification;
+    try {
+      Notification = mongoose.model("Notification");
+    } catch (error) {
+      // If model doesn't exist, create minimal response
+      return res.json({
+        success: true,
+        message: 'Test notification endpoint is working',
+        data: {
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    const notificationCount = await Notification.countDocuments();
+
+    res.json({
+      success: true,
+      message: 'Test notification endpoint is working',
+      data: {
+        totalNotifications: notificationCount,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('❌ Test notification endpoint failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Test notification endpoint failed',
+      error: error.message
+    });
+  }
+});
+
+// POST version for FCM debug panel tests
+app.post('/api/test-notification', async (req, res) => {
+  try {
+    const { token, title, body } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'FCM token is required for test notification'
+      });
+    }
+
+    // Try to send test notification using Firebase utils
+    try {
+      const { sendPushNotifications } = require('./utils/firebaseUtils');
+
+      // Create a test user ID (just for the test)
+      const testUserId = 'test-user-' + Date.now();
+
+      // Mock user with the provided token by temporarily creating user-like object
+      const User = require('./server/models/User');
+      const testUser = new User({
+        _id: new require('mongoose').Types.ObjectId(),
+        name: 'Debug Test User',
+        fcmToken: token,
+        isActive: true
+      });
+
+      // Don't save to DB, just use for FCM test
+      const result = await sendPushNotifications(
+        [testUser._id],
+        title || 'Debug Test',
+        body || 'This is a test notification from the debug panel'
+      );
+
+      res.json({
+        success: result.success,
+        message: result.message,
+        stats: result.stats
+      });
+    } catch (fcmError) {
+      console.error('❌ FCM test failed:', fcmError);
+      res.json({
+        success: false,
+        message: 'FCM test failed: ' + fcmError.message,
+        error: fcmError.message
+      });
+    }
+  } catch (error) {
+    console.error('❌ Test notification POST failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Test notification failed',
+      error: error.message
+    });
+  }
 });
 
 // Authentication middleware
@@ -191,6 +288,65 @@ const notificationRoutes = require('./server/routes/notifications');
 const userRoutes = require('./server/routes/profile');
 const adminRoutes = require('./server/routes/admin');
 const adminPinRoutes = require('./server/routes/admin-pin');
+
+// Firebase status endpoint for debugging
+app.get('/api/fcm-status', async (req, res) => {
+  try {
+    const { getFirebaseStatus, isFirebaseAvailable } = require('./utils/firebaseUtils');
+
+    // Get Firebase status
+    const firebaseStatus = getFirebaseStatus();
+    const isAvailable = isFirebaseAvailable();
+
+    // Get user token statistics
+    const totalUsers = await User.countDocuments({ isActive: { $ne: false } });
+    const usersWithTokens = await User.countDocuments({
+      fcmToken: { $ne: null, $exists: true },
+      isActive: { $ne: false }
+    });
+
+    // Get tokens by platform
+    const webTokens = await User.countDocuments({
+      fcmToken: { $ne: null, $exists: true },
+      fcmTokenPlatform: 'web',
+      isActive: { $ne: false }
+    });
+
+    const nativeTokens = await User.countDocuments({
+      fcmToken: { $ne: null, $exists: true },
+      fcmTokenPlatform: 'native',
+      isActive: { $ne: false }
+    });
+
+    res.json({
+      success: true,
+      firebase: {
+        available: isAvailable,
+        status: firebaseStatus
+      },
+      data: {
+        totalUsers,
+        usersWithTokens,
+        usersWithoutTokens: totalUsers - usersWithTokens,
+        tokenBreakdown: {
+          web: webTokens,
+          native: nativeTokens,
+          unknown: usersWithTokens - webTokens - nativeTokens
+        },
+        readinessPercentage: totalUsers > 0 ? Math.round((usersWithTokens / totalUsers) * 100) : 0
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ FCM status check failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get FCM status',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Import debug route
 const debugRoutes = require('./debug-user-permissions');
@@ -591,7 +747,7 @@ app.delete('/api/user/delete', verifyToken, async (req, res) => {
     // Also delete user's notifications
     await Notification.deleteMany({ userId });
 
-    console.log(`✅ User account deleted: ${deletedUser.name} (${deletedUser.phone})`);
+    console.log(`�� User account deleted: ${deletedUser.name} (${deletedUser.phone})`);
 
     res.json({
       success: true,
