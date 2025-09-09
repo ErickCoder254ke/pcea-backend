@@ -31,7 +31,7 @@ try {
 }
 
 // Import authentication middleware
-const { verifyToken, requireAdmin } = require('../../middlewares/auth');
+const { verifyToken, requireAdminAccess } = require('../../middlewares/flexible-auth');
 
 // GET /notifications - Get user notifications
 router.get('/', verifyToken, async (req, res) => {
@@ -184,7 +184,7 @@ router.post('/clear', verifyToken, async (req, res) => {
 });
 
 // POST /notifications/send - Admin route to send notifications to users
-router.post('/send', verifyToken, requireAdmin, async (req, res) => {
+router.post('/send', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     // Import Firebase utility
     const { sendPushNotifications, sendToAllUsers } = require('../../utils/firebaseUtils');
@@ -343,7 +343,7 @@ router.delete('/:notificationId', verifyToken, async (req, res) => {
 });
 
 // GET /notifications/stats - Get notification statistics for admin
-router.get('/stats', verifyToken, requireAdmin, async (req, res) => {
+router.get('/stats', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const totalNotifications = await Notification.countDocuments();
     const readNotifications = await Notification.countDocuments({ read: true });

@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { verifyToken, requireAdmin } = require('../../middlewares/auth');
+const { verifyToken, requireAdminAccess } = require('../../middlewares/flexible-auth');
 
 // GET /api/admin/users - Get all users for admin panel
-router.get('/users', verifyToken, requireAdmin, async (req, res) => {
+router.get('/users', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { page = 1, limit = 100, search, active, hasToken } = req.query;
 
@@ -96,7 +96,7 @@ router.get('/users', verifyToken, requireAdmin, async (req, res) => {
 });
 
 // GET /api/admin/users/stats - Get user statistics
-router.get('/users/stats', verifyToken, requireAdmin, async (req, res) => {
+router.get('/users/stats', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const stats = await Promise.all([
       User.countDocuments(),
@@ -131,7 +131,7 @@ router.get('/users/stats', verifyToken, requireAdmin, async (req, res) => {
 });
 
 // PUT /api/admin/users/:userId/status - Update user status
-router.put('/users/:userId/status', verifyToken, requireAdmin, async (req, res) => {
+router.put('/users/:userId/status', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { userId } = req.params;
     const { isActive } = req.body;

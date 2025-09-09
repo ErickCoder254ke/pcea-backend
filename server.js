@@ -190,6 +190,10 @@ const prayerRequestRoutes = require('./server/routes/prayerRequests');
 const notificationRoutes = require('./server/routes/notifications');
 const userRoutes = require('./server/routes/profile');
 const adminRoutes = require('./server/routes/admin');
+const adminPinRoutes = require('./server/routes/admin-pin');
+
+// Import debug route
+const debugRoutes = require('./debug-user-permissions');
 
 // Import upload handler if available
 let uploadRoutes = null;
@@ -215,6 +219,8 @@ app.use('/api/prayer-requests', prayerRequestRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin-pin', adminPinRoutes);
+app.use('/api/debug', debugRoutes);
 
 // Add upload routes if available
 if (uploadRoutes) {
