@@ -360,40 +360,7 @@ try {
   console.warn('⚠️ Upload handler not available:', error.message);
 }
 
-// API routes
-app.use('/api/announcements', announcementRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/gallery', galleryRoutes);
-app.use('/api/sermons', sermonRoutes);
-app.use('/api/videos', videoRoutes);
-app.use('/api/lyrics', lyricsRoutes);
-app.use('/api/lyrics-simple', lyricsSimpleRoutes);
-app.use('/api/meditation', meditationRoutes);
-app.use('/api/prayer-partners', prayerPartnerRoutes);
-app.use('/api/partnership-requests', partnershipRequestRoutes);
-app.use('/api/prayer-requests', prayerRequestRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin-pin', adminPinRoutes);
-app.use('/api/debug', debugRoutes);
-
-// Add upload routes if available
-if (uploadRoutes) {
-  app.use('/api', uploadRoutes);
-}
-
-// Legacy route mounts for frontend compatibility
-app.use('/announcements', announcementRoutes);
-app.use('/events', eventRoutes);
-app.use('/gallery', galleryRoutes);
-app.use('/meditation', meditationRoutes);
-app.use('/ppartner', prayerPartnerRoutes);
-app.use('/partnership-requests', partnershipRequestRoutes);
-app.use('/prayer-requests', prayerRequestRoutes);
-
-// User Authentication Endpoints
-
+// User Authentication Endpoints (must be defined before mounting user router)
 // User Registration
 app.post('/api/user/register', async (req, res) => {
   try {
@@ -520,6 +487,39 @@ app.post('/api/user/login', async (req, res) => {
     });
   }
 });
+
+// API routes
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/gallery', galleryRoutes);
+app.use('/api/sermons', sermonRoutes);
+app.use('/api/videos', videoRoutes);
+app.use('/api/lyrics', lyricsRoutes);
+app.use('/api/lyrics-simple', lyricsSimpleRoutes);
+app.use('/api/meditation', meditationRoutes);
+app.use('/api/prayer-partners', prayerPartnerRoutes);
+app.use('/api/partnership-requests', partnershipRequestRoutes);
+app.use('/api/prayer-requests', prayerRequestRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/admin-pin', adminPinRoutes);
+app.use('/api/debug', debugRoutes);
+
+// Add upload routes if available
+if (uploadRoutes) {
+  app.use('/api', uploadRoutes);
+}
+
+// Legacy route mounts for frontend compatibility
+app.use('/announcements', announcementRoutes);
+app.use('/events', eventRoutes);
+app.use('/gallery', galleryRoutes);
+app.use('/meditation', meditationRoutes);
+app.use('/ppartner', prayerPartnerRoutes);
+app.use('/partnership-requests', partnershipRequestRoutes);
+app.use('/prayer-requests', prayerRequestRoutes);
+
 
 // Update FCM Token
 app.post('/api/user/update-fcm-token', verifyToken, async (req, res) => {

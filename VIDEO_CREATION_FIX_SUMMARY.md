@@ -1,12 +1,17 @@
 # Video Creation Fix Summary
 
-## Issue Identified
+## Issues Identified
+
+### 1. Missing Admin Access Middleware (Initial Issue)
 The video creation was failing with a 500 Internal Server Error because the backend `/api/videos` POST route was missing proper admin access middleware.
 
-## Root Cause
-- The video creation route in `backend/server/routes/videos.js` only had `verifyToken` middleware
-- It was missing `requireAdminAccess` middleware to verify admin privileges
-- Users with valid tokens but without admin privileges could attempt to create videos, causing authentication failures
+### 2. Validation Error - uploadedBy Field (New Issue)
+After fixing admin middleware, discovered validation error: `uploadedBy: Path 'uploadedBy' is required.`
+
+## Root Causes
+1. **Admin Access**: Missing `requireAdminAccess` middleware to verify admin privileges
+2. **User ID Reference**: Code was using `req.user._id` but auth middleware sets `req.user.id`
+3. **ObjectId Conversion**: User ID needed proper MongoDB ObjectId conversion
 
 ## Fixes Applied
 
@@ -17,18 +22,38 @@ The video creation was failing with a 500 Internal Server Error because the back
 // BEFORE
 router.post('/', verifyToken, async (req, res) => {
 
-// AFTER  
+// AFTER
 router.post('/', verifyToken, requireAdminAccess, async (req, res) => {
 ```
 
 ### 2. Fixed Other Admin Routes
 Also added `requireAdminAccess` to other admin-only routes:
 - `PUT /api/videos/:id` - Update video
-- `DELETE /api/videos/:id` - Delete video  
+- `DELETE /api/videos/:id` - Delete video
 - `POST /api/videos/bulk` - Bulk create videos
 
-### 3. Middleware Already Properly Imported
-Confirmed that `requireAdminAccess` was already imported from `'../../middlewares/flexible-auth'`
+### 3. Fixed uploadedBy Field Reference
+**File:** `backend/server/routes/videos.js`
+
+```javascript
+// BEFORE
+uploadedBy: req.user._id
+
+// AFTER
+uploadedBy: new mongoose.Types.ObjectId(req.user.id)
+```
+
+### 4. Added Mongoose Import
+Added mongoose import for ObjectId conversion:
+
+```javascript
+const mongoose = require('mongoose');
+```
+
+### 5. Applied Fixes to Both Routes
+Fixed uploadedBy field in both:
+- Single video creation route (POST `/api/videos`)
+- Bulk video creation route (POST `/api/videos/bulk`)
 
 ## Testing the Fix
 

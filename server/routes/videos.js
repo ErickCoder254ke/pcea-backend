@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Video = require('../models/Video');
 const { verifyToken, optionalAuth, requireAdmin } = require('../../middlewares/auth');
 const { requireAdminAccess } = require('../../middlewares/flexible-auth');
@@ -312,7 +313,7 @@ router.post('/', verifyToken, requireAdminAccess, async (req, res) => {
       featured: Boolean(featured),
       source: source,
       status: status,
-      uploadedBy: req.user._id
+      uploadedBy: new mongoose.Types.ObjectId(req.user.id)
     };
 
     const newVideo = new Video(videoData);
@@ -602,7 +603,7 @@ router.post('/bulk', verifyToken, requireAdminAccess, async (req, res) => {
           title: videoData.title.trim(),
           description: videoData.description?.trim() || '',
           tags: Array.isArray(videoData.tags) ? videoData.tags.map(tag => tag.trim().toLowerCase()) : [],
-          uploadedBy: req.user._id
+          uploadedBy: new mongoose.Types.ObjectId(req.user.id)
         });
 
         const savedVideo = await newVideo.save();

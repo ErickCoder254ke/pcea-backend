@@ -86,6 +86,8 @@ router.get("/userinfo", authenticateToken, async (req, res) => {
 // Update user profile - simplified to handle only essential fields
 router.put("/userinfo", authenticateToken, async (req, res) => {
   try {
+    console.log(`📝 Profile update request from user ${req.user.id}:`, req.body);
+
     const {
       name,
       phone,
@@ -138,6 +140,7 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
     }
 
     if (errors.length > 0) {
+      console.log(`❌ Validation errors for user ${req.user.id}:`, errors);
       return res.status(400).json({
         success: false,
         message: "Validation errors",
