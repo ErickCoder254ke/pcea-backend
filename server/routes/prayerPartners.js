@@ -3,6 +3,7 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const { verifyToken, requireAdmin } = require("../../middlewares/auth");
+const { requireAdminAccess } = require("../../middlewares/flexible-auth");
 
 // Helper function to pair users
 const assignPartners = async () => {
@@ -72,7 +73,7 @@ const pairNewUsers = async () => {
 };
 
 // Route to trigger pairing manually
-router.post("/pair-users", requireAdmin, async (req, res) => {
+router.post("/pair-users", verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { pairs, error } = await assignPartners();
     if (error) return res.status(500).json({ message: "Error pairing users", error });
@@ -143,7 +144,7 @@ router.get("/current-pairs", async (req, res) => {
 });
 
 // Admin route to get detailed statistics
-router.get("/admin/stats", requireAdmin, async (req, res) => {
+router.get("/admin/stats", verifyToken, requireAdminAccess, async (req, res) => {
   try {
     // Get all users with prayer partner data
     const allUsers = await User.find({});
@@ -195,7 +196,7 @@ router.get("/admin/stats", requireAdmin, async (req, res) => {
 });
 
 // Admin route to get detailed pairs with more information
-router.get("/admin/pairs", requireAdmin, async (req, res) => {
+router.get("/admin/pairs", verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const users = await User.find({ currentPartner: { $ne: null } }).populate(
       "currentPartner",
@@ -268,7 +269,7 @@ router.get("/admin/pairs", requireAdmin, async (req, res) => {
 });
 
 // Admin route to unpair users
-router.delete("/admin/unpair/:pairId", requireAdmin, async (req, res) => {
+router.delete("/admin/unpair/:pairId", verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { pairId } = req.params;
 
@@ -308,7 +309,7 @@ router.delete("/admin/unpair/:pairId", requireAdmin, async (req, res) => {
 });
 
 // Admin route to manually create a specific pair
-router.post("/admin/create-pair", requireAdmin, async (req, res) => {
+router.post("/admin/create-pair", verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { user1Id, user2Id } = req.body;
 
@@ -376,7 +377,7 @@ router.post("/admin/create-pair", requireAdmin, async (req, res) => {
 });
 
 // Admin route to force reshuffle (alias for existing pair-users endpoint)
-router.post("/admin/reshuffle", requireAdmin, async (req, res) => {
+router.post("/admin/reshuffle", verifyToken, requireAdminAccess, async (req, res) => {
   try {
     // First, unpair all current users
     await User.updateMany(
@@ -414,7 +415,7 @@ router.post("/admin/reshuffle", requireAdmin, async (req, res) => {
 });
 
 // Admin route to get pairing history
-router.get("/admin/history", requireAdmin, async (req, res) => {
+router.get("/admin/history", verifyToken, requireAdminAccess, async (req, res) => {
   try {
     // Check if PrayerPartnership model exists
     let history = [];

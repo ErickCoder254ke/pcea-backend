@@ -3,6 +3,7 @@ const router = express.Router();
 const PrayerPartnerRequest = require('../models/PrayerPartnerRequest');
 const User = require('../models/User');
 const { verifyToken, requireAdmin } = require('../../middlewares/auth');
+const { requireAdminAccess } = require('../../middlewares/flexible-auth');
 
 // Send a partnership request
 router.post('/send', verifyToken, async (req, res) => {
@@ -298,7 +299,7 @@ router.post('/:id/decline', verifyToken, async (req, res) => {
 });
 
 // Admin: Get all partnership requests
-router.get('/admin/all', requireAdmin, async (req, res) => {
+router.get('/admin/all', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
 
@@ -358,7 +359,7 @@ router.get('/admin/all', requireAdmin, async (req, res) => {
 });
 
 // Admin: Get partnership request statistics
-router.get('/admin/stats', requireAdmin, async (req, res) => {
+router.get('/admin/stats', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const stats = await PrayerPartnerRequest.getStatistics();
     
@@ -383,7 +384,7 @@ router.get('/admin/stats', requireAdmin, async (req, res) => {
 });
 
 // Admin: Update partnership request (add notes, change status)
-router.patch('/admin/:id', requireAdmin, async (req, res) => {
+router.patch('/admin/:id', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const { adminNotes, status } = req.body;
@@ -430,7 +431,7 @@ router.patch('/admin/:id', requireAdmin, async (req, res) => {
 });
 
 // Cleanup expired requests (this could be called by a cron job)
-router.post('/admin/cleanup-expired', requireAdmin, async (req, res) => {
+router.post('/admin/cleanup-expired', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const result = await PrayerPartnerRequest.cleanupExpiredRequests();
 

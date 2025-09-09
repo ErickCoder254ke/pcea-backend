@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Gallery = require('../models/Gallery');
 const { verifyToken, optionalAuth } = require('../../middlewares/auth');
+const { requireAdminAccess } = require('../../middlewares/flexible-auth');
 
 // GET all gallery items (public endpoint with optional auth)
 router.get('/', optionalAuth, async (req, res) => {
@@ -564,7 +565,7 @@ router.post('/bulk', verifyToken, async (req, res) => {
 });
 
 // GET gallery statistics (admin only)
-router.get('/admin/stats', verifyToken, async (req, res) => {
+router.get('/admin/stats', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const stats = await Gallery.getStats();
     

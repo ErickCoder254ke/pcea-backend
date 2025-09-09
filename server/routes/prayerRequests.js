@@ -3,6 +3,7 @@ const router = express.Router();
 const PrayerRequest = require('../models/PrayerRequest');
 const User = require('../models/User');
 const { verifyToken, requireAdmin } = require('../../middlewares/auth');
+const { requireAdminAccess } = require('../../middlewares/flexible-auth');
 
 // Create a new prayer request
 router.post('/', verifyToken, async (req, res) => {
@@ -184,7 +185,7 @@ router.get('/my-requests', verifyToken, async (req, res) => {
 });
 
 // Admin: Get all prayer requests for moderation
-router.get('/admin', requireAdmin, async (req, res) => {
+router.get('/admin', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { status, category, urgency, page = 1, limit = 20 } = req.query;
 
@@ -253,7 +254,7 @@ router.get('/admin', requireAdmin, async (req, res) => {
 });
 
 // Admin: Get pending prayer requests
-router.get('/admin/pending', requireAdmin, async (req, res) => {
+router.get('/admin/pending', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const pendingRequests = await PrayerRequest.find({ status: 'pending' })
       .populate('requesterId', 'name phone fellowshipZone')
@@ -287,7 +288,7 @@ router.get('/admin/pending', requireAdmin, async (req, res) => {
 });
 
 // Admin: Approve a prayer request
-router.post('/:id/approve', requireAdmin, async (req, res) => {
+router.post('/:id/approve', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const moderatorId = req.user.id;
@@ -337,7 +338,7 @@ router.post('/:id/approve', requireAdmin, async (req, res) => {
 });
 
 // Admin: Reject a prayer request
-router.post('/:id/reject', requireAdmin, async (req, res) => {
+router.post('/:id/reject', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
