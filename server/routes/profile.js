@@ -10,10 +10,16 @@ const router = express.Router();
 
 // Middleware to verify token
 const authenticateToken = (req, res, next) => {
+  console.log(`🔐 Auth check for ${req.method} ${req.path}`);
+
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
 
+  console.log(`🔐 Auth header: ${authHeader ? 'present' : 'missing'}`);
+  console.log(`🔐 Token: ${token ? 'present' : 'missing'}`);
+
   if (!token) {
+    console.log(`❌ No token provided`);
     return res.status(401).json({
       success: false,
       message: "Access denied. No token provided."
@@ -22,11 +28,13 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
+      console.log(`❌ Token verification failed:`, err.message);
       return res.status(403).json({
         success: false,
         message: "Invalid or expired token."
       });
     }
+    console.log(`✅ Token verified for user: ${user.id}`);
     req.user = user;
     next();
   });
@@ -82,6 +90,8 @@ router.get("/userinfo", authenticateToken, async (req, res) => {
 router.put("/userinfo", authenticateToken, async (req, res) => {
   try {
     console.log(`📝 Profile update request from user ${req.user.id}`);
+    console.log(`📝 Request body:`, req.body);
+    console.log(`📝 Headers:`, req.headers);
 
     const {
       name,
@@ -89,6 +99,8 @@ router.put("/userinfo", authenticateToken, async (req, res) => {
       bio,
       profileImage
     } = req.body;
+
+    console.log(`📝 Extracted fields: name="${name}", email="${email}", bio="${bio}", profileImage="${profileImage}"`);
 
     // Note: Phone number is not included - it's read-only during profile updates
 
