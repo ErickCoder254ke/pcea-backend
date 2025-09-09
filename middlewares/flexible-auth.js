@@ -87,33 +87,69 @@ const requireAdminAccess = async (req, res, next) => {
 
     // Method 1: Check for PIN-based admin token in headers
     const adminToken = req.headers['x-admin-token'];
+    console.log(`🔍 Admin token present: ${!!adminToken}`);
+    console.log(`🔍 User ID from auth: ${req.user.id}`);
+
     if (adminToken) {
       try {
+        console.log(`🔍 Attempting to verify admin token...`);
         const adminDecoded = jwt.verify(adminToken, process.env.JWT_SECRET);
+        console.log(`🔍 Admin token decoded:`, {
+          userId: adminDecoded.userId,
+          adminVerified: adminDecoded.adminVerified,
+          isAdmin: adminDecoded.isAdmin,
+          exp: adminDecoded.exp ? new Date(adminDecoded.exp * 1000) : null
+        });
+
         if (adminDecoded.adminVerified && adminDecoded.userId === req.user.id) {
           console.log(`🔐 PIN-based admin access granted to user: ${req.user.id}`);
           req.adminVerified = true;
           req.adminMethod = 'pin';
           return next();
+        } else {
+          console.log(`❌ Admin token verification failed:`, {
+            adminVerified: adminDecoded.adminVerified,
+            userIdMatch: adminDecoded.userId === req.user.id,
+            tokenUserId: adminDecoded.userId,
+            requestUserId: req.user.id
+          });
         }
       } catch (adminTokenError) {
-        console.log('❌ Invalid admin token:', adminTokenError.message);
+        console.log('❌ Invalid admin token error:', adminTokenError.message);
+        console.log('❌ Admin token error details:', {
+          name: adminTokenError.name,
+          message: adminTokenError.message,
+          tokenLength: adminToken ? adminToken.length : 0,
+          tokenStart: adminToken ? adminToken.substring(0, 20) + '...' : 'null',
+          jwtSecretExists: !!process.env.JWT_SECRET
+        });
         // Continue to check database method
       }
+    } else {
+      console.log('❌ No admin token in headers');
     }
 
     // Method 2: Check database admin role (fallback for existing admin users)
+    console.log(`🔍 Checking database admin permissions for user: ${req.user.id}`);
     try {
       const User = require('../server/models/User');
       const user = await User.findById(req.user.id).select('role isAdmin');
 
       if (!user) {
+        console.log(`❌ User not found in database: ${req.user.id}`);
         return res.status(404).json({
           success: false,
           message: "User not found",
           code: "USER_NOT_FOUND"
         });
       }
+
+      console.log(`🔍 User found in database:`, {
+        id: user._id,
+        role: user.role,
+        isAdmin: user.isAdmin,
+        hasIsAdminUserMethod: typeof user.isAdminUser === 'function'
+      });
 
       // Check if user has database admin permissions
       if (user.isAdminUser && user.isAdminUser()) {
@@ -123,6 +159,8 @@ const requireAdminAccess = async (req, res, next) => {
         req.user.role = user.role;
         req.user.isAdmin = user.isAdmin;
         return next();
+      } else {
+        console.log(`❌ User does not have database admin permissions`);
       }
     } catch (dbError) {
       console.error("❌ Error checking database admin status:", dbError);

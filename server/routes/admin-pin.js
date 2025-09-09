@@ -27,10 +27,12 @@ router.post('/verify', verifyToken, async (req, res) => {
     }
 
     // Generate admin session token
+    console.log(`🔑 Generating admin token for user ID: ${req.user.id}`);
+
     const adminToken = jwt.sign(
-      { 
-        userId: req.user.id, 
-        isAdmin: true, 
+      {
+        userId: req.user.id,
+        isAdmin: true,
         adminVerified: true,
         pinVerifiedAt: new Date().toISOString()
       },
@@ -39,6 +41,7 @@ router.post('/verify', verifyToken, async (req, res) => {
     );
 
     console.log(`✅ Admin PIN verified for user ${req.user.id}`);
+    console.log(`🔑 Admin token generated successfully`);
 
     res.json({
       success: true,
@@ -95,6 +98,62 @@ router.get('/status', verifyToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to check admin status',
+      error: error.message
+    });
+  }
+});
+
+// DEBUG endpoint to test admin token verification
+router.post('/debug', verifyToken, async (req, res) => {
+  try {
+    const adminToken = req.headers['x-admin-token'];
+
+    if (!adminToken) {
+      return res.json({
+        success: false,
+        message: 'No admin token provided',
+        headers: Object.keys(req.headers),
+        userId: req.user.id
+      });
+    }
+
+    try {
+      const adminDecoded = jwt.verify(adminToken, process.env.JWT_SECRET);
+
+      res.json({
+        success: true,
+        message: 'Admin token verification successful',
+        tokenData: {
+          userId: adminDecoded.userId,
+          isAdmin: adminDecoded.isAdmin,
+          adminVerified: adminDecoded.adminVerified,
+          exp: adminDecoded.exp ? new Date(adminDecoded.exp * 1000) : null,
+          iat: adminDecoded.iat ? new Date(adminDecoded.iat * 1000) : null
+        },
+        requestUser: req.user.id,
+        userIdMatch: adminDecoded.userId === req.user.id,
+        jwtSecretExists: !!process.env.JWT_SECRET
+      });
+    } catch (tokenError) {
+      res.json({
+        success: false,
+        message: 'Admin token verification failed',
+        error: {
+          name: tokenError.name,
+          message: tokenError.message
+        },
+        tokenInfo: {
+          length: adminToken.length,
+          start: adminToken.substring(0, 20) + '...'
+        },
+        requestUser: req.user.id,
+        jwtSecretExists: !!process.env.JWT_SECRET
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Debug endpoint error',
       error: error.message
     });
   }
