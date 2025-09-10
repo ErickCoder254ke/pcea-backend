@@ -384,7 +384,7 @@ router.put('/users/:userId', verifyToken, requireAdminAccess, async (req, res) =
   }
 });
 
-// DELETE /api/admin/users/:userId - Delete user (optional, use with caution)
+// DELETE /api/admin/users/:userId - Delete user with proper prayer partner cleanup
 router.delete('/users/:userId', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -406,23 +406,52 @@ router.delete('/users/:userId', verifyToken, requireAdminAccess, async (req, res
       });
     }
 
-    // Instead of hard delete, we could just deactivate the account
-    // For now, we'll do a soft delete by setting isActive to false
+    // Handle prayer partner cleanup if user has a current partner
+    if (user.currentPartner) {
+      console.log(`🔗 User ${userId} has prayer partner ${user.currentPartner}, unpairing...`);
+
+      // Remove partner relationship for both users
+      await User.findByIdAndUpdate(user.currentPartner, {
+        currentPartner: null,
+        paired_this_week: false
+      });
+
+      console.log(`✅ Successfully unpaired partner ${user.currentPartner} from deleted user ${userId}`);
+    }
+
+    // Also check if this user is someone else's partner and clean up
+    const partnerOfThisUser = await User.findOne({ currentPartner: userId });
+    if (partnerOfThisUser) {
+      console.log(`🔗 Found user ${partnerOfThisUser._id} who has ${userId} as partner, unpairing...`);
+
+      await User.findByIdAndUpdate(partnerOfThisUser._id, {
+        currentPartner: null,
+        paired_this_week: false
+      });
+
+      console.log(`✅ Successfully unpaired user ${partnerOfThisUser._id} from deleted user ${userId}`);
+    }
+
+    // Perform soft delete and clear prayer partner fields
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       {
         isActive: false,
         deletedAt: new Date(),
-        deletedBy: req.user.id
+        deletedBy: req.user.id,
+        // Clear prayer partner fields
+        currentPartner: null,
+        paired_this_week: false,
+        last_paired_with: null
       },
-      { new: true, select: '_id name phone isActive' }
+      { new: true, select: '_id name phone isActive currentPartner' }
     );
 
-    console.log(`👤 Admin ${req.user.id} soft-deleted user ${userId}`);
+    console.log(`👤 Admin ${req.user.id} soft-deleted user ${userId} with prayer partner cleanup`);
 
     res.json({
       success: true,
-      message: 'User account deactivated successfully',
+      message: 'User account deactivated and unpaired from prayer partner successfully',
       user: updatedUser
     });
 
@@ -436,7 +465,49 @@ router.delete('/users/:userId', verifyToken, requireAdminAccess, async (req, res
   }
 });
 
-// POST /api/admin/users/bulk-delete - Bulk delete users (Admin only)
+// PUT /api/admin/users/:userId/restore - Restore user (Admin only)
+router.put('/users/:userId/restore', verifyToken, requireAdminAccess, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        isActive: true,
+        deletedAt: null,
+        deletedBy: null,
+        restoredAt: new Date(),
+        restoredBy: req.user.id,
+        updatedAt: new Date()
+      },
+      { new: true }
+    ).select('-password -__v');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    console.log(`👤 Admin ${req.user.id} restored user account: ${user.email} (ID: ${userId})`);
+
+    res.json({
+      success: true,
+      message: 'User account restored successfully',
+      data: user
+    });
+  } catch (error) {
+    console.error('❌ Error restoring user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to restore user account',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/admin/users/bulk-delete - Bulk delete users with prayer partner cleanup
 router.post('/users/bulk-delete', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { userIds } = req.body;
@@ -456,24 +527,57 @@ router.post('/users/bulk-delete', verifyToken, requireAdminAccess, async (req, r
       });
     }
 
-    // Perform bulk soft delete (deactivate accounts)
+    // Get users to be deleted and their prayer partners
+    const usersToDelete = await User.find({ _id: { $in: userIds } });
+    const partnerIds = usersToDelete
+      .filter(user => user.currentPartner)
+      .map(user => user.currentPartner);
+
+    // Find users who have any of the deleted users as partners
+    const usersWithDeletedPartners = await User.find({
+      currentPartner: { $in: userIds }
+    });
+
+    console.log(`🔗 Found ${partnerIds.length} direct partners and ${usersWithDeletedPartners.length} reverse partners to unpair`);
+
+    // Unpair all affected users (both directions)
+    const allAffectedPartnerIds = [...new Set([...partnerIds, ...usersWithDeletedPartners.map(u => u._id)])];
+
+    if (allAffectedPartnerIds.length > 0) {
+      await User.updateMany(
+        { _id: { $in: allAffectedPartnerIds } },
+        {
+          currentPartner: null,
+          paired_this_week: false
+        }
+      );
+
+      console.log(`✅ Unpaired ${allAffectedPartnerIds.length} users from prayer partnerships`);
+    }
+
+    // Perform bulk soft delete (deactivate accounts) and clear prayer partner fields
     const result = await User.updateMany(
       { _id: { $in: userIds } },
       {
         isActive: false,
         deletedAt: new Date(),
-        deletedBy: req.user.id
+        deletedBy: req.user.id,
+        // Clear prayer partner fields
+        currentPartner: null,
+        paired_this_week: false,
+        last_paired_with: null
       }
     );
 
-    console.log(`👤 Admin ${req.user.id} bulk-deactivated ${result.modifiedCount} users`);
+    console.log(`👤 Admin ${req.user.id} bulk-deactivated ${result.modifiedCount} users with prayer partner cleanup`);
 
     res.json({
       success: true,
-      message: `${result.modifiedCount} user accounts deactivated successfully`,
+      message: `${result.modifiedCount} user accounts deactivated and unpaired successfully`,
       data: {
         requested: userIds.length,
-        deletedCount: result.modifiedCount
+        deletedCount: result.modifiedCount,
+        unpairedPartners: allAffectedPartnerIds.length
       }
     });
 
