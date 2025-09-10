@@ -388,6 +388,7 @@ router.put('/users/:userId', verifyToken, requireAdminAccess, async (req, res) =
 router.delete('/users/:userId', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { userId } = req.params;
+    const PrayerPartnerRequest = require('../models/PrayerPartnerRequest');
 
     // Check if user exists
     const user = await User.findById(userId);
@@ -432,6 +433,25 @@ router.delete('/users/:userId', verifyToken, requireAdminAccess, async (req, res
       console.log(`✅ Successfully unpaired user ${partnerOfThisUser._id} from deleted user ${userId}`);
     }
 
+    // Clean up prayer partner requests - expire all pending requests involving this user
+    const requestCleanupResult = await PrayerPartnerRequest.updateMany(
+      {
+        $or: [
+          { requester: userId, status: 'pending' },
+          { recipient: userId, status: 'pending' }
+        ]
+      },
+      {
+        status: 'expired',
+        respondedAt: new Date(),
+        adminNotes: 'Auto-expired due to user deletion'
+      }
+    );
+
+    if (requestCleanupResult.modifiedCount > 0) {
+      console.log(`🧹 Expired ${requestCleanupResult.modifiedCount} prayer partner requests for deleted user ${userId}`);
+    }
+
     // Perform soft delete and clear prayer partner fields
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -447,12 +467,15 @@ router.delete('/users/:userId', verifyToken, requireAdminAccess, async (req, res
       { new: true, select: '_id name phone isActive currentPartner' }
     );
 
-    console.log(`👤 Admin ${req.user.id} soft-deleted user ${userId} with prayer partner cleanup`);
+    console.log(`👤 Admin ${req.user.id} soft-deleted user ${userId} with complete prayer partner cleanup`);
 
     res.json({
       success: true,
-      message: 'User account deactivated and unpaired from prayer partner successfully',
-      user: updatedUser
+      message: 'User account deactivated and all prayer partner relationships cleaned up successfully',
+      user: updatedUser,
+      cleanup: {
+        requestsExpired: requestCleanupResult.modifiedCount
+      }
     });
 
   } catch (error) {
@@ -511,6 +534,7 @@ router.put('/users/:userId/restore', verifyToken, requireAdminAccess, async (req
 router.post('/users/bulk-delete', verifyToken, requireAdminAccess, async (req, res) => {
   try {
     const { userIds } = req.body;
+    const PrayerPartnerRequest = require('../models/PrayerPartnerRequest');
 
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
@@ -555,6 +579,25 @@ router.post('/users/bulk-delete', verifyToken, requireAdminAccess, async (req, r
       console.log(`✅ Unpaired ${allAffectedPartnerIds.length} users from prayer partnerships`);
     }
 
+    // Clean up prayer partner requests - expire all pending requests involving deleted users
+    const requestCleanupResult = await PrayerPartnerRequest.updateMany(
+      {
+        $or: [
+          { requester: { $in: userIds }, status: 'pending' },
+          { recipient: { $in: userIds }, status: 'pending' }
+        ]
+      },
+      {
+        status: 'expired',
+        respondedAt: new Date(),
+        adminNotes: 'Auto-expired due to user deletion'
+      }
+    );
+
+    if (requestCleanupResult.modifiedCount > 0) {
+      console.log(`🧹 Expired ${requestCleanupResult.modifiedCount} prayer partner requests for bulk deleted users`);
+    }
+
     // Perform bulk soft delete (deactivate accounts) and clear prayer partner fields
     const result = await User.updateMany(
       { _id: { $in: userIds } },
@@ -569,15 +612,16 @@ router.post('/users/bulk-delete', verifyToken, requireAdminAccess, async (req, r
       }
     );
 
-    console.log(`👤 Admin ${req.user.id} bulk-deactivated ${result.modifiedCount} users with prayer partner cleanup`);
+    console.log(`👤 Admin ${req.user.id} bulk-deactivated ${result.modifiedCount} users with complete prayer partner cleanup`);
 
     res.json({
       success: true,
-      message: `${result.modifiedCount} user accounts deactivated and unpaired successfully`,
+      message: `${result.modifiedCount} user accounts deactivated and all prayer partner relationships cleaned up successfully`,
       data: {
         requested: userIds.length,
         deletedCount: result.modifiedCount,
-        unpairedPartners: allAffectedPartnerIds.length
+        unpairedPartners: allAffectedPartnerIds.length,
+        requestsExpired: requestCleanupResult.modifiedCount
       }
     });
 
