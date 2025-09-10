@@ -25,16 +25,16 @@ router.post('/send', verifyToken, async (req, res) => {
       });
     }
 
-    // Check if users exist
+    // Check if users exist and are active
     const [requester, recipient] = await Promise.all([
-      User.findById(requesterId).select('name fellowshipZone'),
-      User.findById(recipientId).select('name fellowshipZone')
+      User.findOne({ _id: requesterId, isActive: true }).select('name fellowshipZone'),
+      User.findOne({ _id: recipientId, isActive: true }).select('name fellowshipZone')
     ]);
 
     if (!requester || !recipient) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found or inactive'
       });
     }
 

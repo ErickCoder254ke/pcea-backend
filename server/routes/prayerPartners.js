@@ -8,8 +8,11 @@ const { requireAdminAccess } = require("../../middlewares/flexible-auth");
 // Helper function to pair users
 const assignPartners = async () => {
   try {
-    // Get all users who haven't been paired this week
-    let users = await User.find({ paired_this_week: false });
+    // Get all active users who haven't been paired this week
+    let users = await User.find({
+      paired_this_week: false,
+      isActive: true
+    });
     if (users.length < 2) return { pairs: [], error: "Not enough users to pair." };
 
     const pairs = [];
@@ -57,8 +60,11 @@ const assignPartners = async () => {
 // Automatically check for new users and pair them
 const pairNewUsers = async () => {
   try {
-    // Fetch unpaired users
-    const unpairedUsers = await User.find({ paired_this_week: false });
+    // Fetch unpaired active users
+    const unpairedUsers = await User.find({
+      paired_this_week: false,
+      isActive: true
+    });
     if (unpairedUsers.length >= 2) {
       console.log("New users detected, attempting to pair...");
       const { pairs, error } = await assignPartners();
@@ -88,7 +94,10 @@ router.post("/pair-users", verifyToken, requireAdminAccess, async (req, res) => 
 // Route to fetch current pairs
 router.get("/current-pairs", async (req, res) => {
   try {
-    const users = await User.find({ currentPartner: { $ne: null } }).populate(
+    const users = await User.find({
+      currentPartner: { $ne: null },
+      isActive: true
+    }).populate(
       "currentPartner",
       "name phone"
     );
@@ -120,8 +129,11 @@ router.get("/current-pairs", async (req, res) => {
       }
     });
 
-    // Get unpaired users
-    const unpairedUsers = await User.find({ currentPartner: null }).select("name phone createdAt");
+    // Get unpaired active users
+    const unpairedUsers = await User.find({
+      currentPartner: null,
+      isActive: true
+    }).select("name phone createdAt");
 
     res.status(200).json({ 
       success: true,
@@ -146,10 +158,16 @@ router.get("/current-pairs", async (req, res) => {
 // Admin route to get detailed statistics
 router.get("/admin/stats", verifyToken, requireAdminAccess, async (req, res) => {
   try {
-    // Get all users with prayer partner data
-    const allUsers = await User.find({});
-    const pairedUsers = await User.find({ currentPartner: { $ne: null } });
-    const unpairedUsers = await User.find({ currentPartner: null });
+    // Get all active users with prayer partner data
+    const allUsers = await User.find({ isActive: true });
+    const pairedUsers = await User.find({
+      currentPartner: { $ne: null },
+      isActive: true
+    });
+    const unpairedUsers = await User.find({
+      currentPartner: null,
+      isActive: true
+    });
 
     // Get partnership request statistics
     let partnershipRequestStats = { pending: 0 };
@@ -198,12 +216,18 @@ router.get("/admin/stats", verifyToken, requireAdminAccess, async (req, res) => 
 // Admin route to get detailed pairs with more information
 router.get("/admin/pairs", verifyToken, requireAdminAccess, async (req, res) => {
   try {
-    const users = await User.find({ currentPartner: { $ne: null } }).populate(
+    const users = await User.find({
+      currentPartner: { $ne: null },
+      isActive: true
+    }).populate(
       "currentPartner",
       "name phone _id"
     );
 
-    const unpairedUsers = await User.find({ currentPartner: null });
+    const unpairedUsers = await User.find({
+      currentPartner: null,
+      isActive: true
+    });
 
     if (!users.length && !unpairedUsers.length) {
       return res.status(200).json({
@@ -327,14 +351,14 @@ router.post("/admin/create-pair", verifyToken, requireAdminAccess, async (req, r
       });
     }
 
-    // Check if users exist and are not already paired
-    const user1 = await User.findById(user1Id);
-    const user2 = await User.findById(user2Id);
+    // Check if users exist, are active, and are not already paired
+    const user1 = await User.findOne({ _id: user1Id, isActive: true });
+    const user2 = await User.findOne({ _id: user2Id, isActive: true });
 
     if (!user1 || !user2) {
       return res.status(404).json({
         success: false,
-        message: "One or both users not found"
+        message: "One or both users not found or inactive"
       });
     }
 
@@ -379,9 +403,12 @@ router.post("/admin/create-pair", verifyToken, requireAdminAccess, async (req, r
 // Admin route to force reshuffle (alias for existing pair-users endpoint)
 router.post("/admin/reshuffle", verifyToken, requireAdminAccess, async (req, res) => {
   try {
-    // First, unpair all current users
+    // First, unpair all current active users
     await User.updateMany(
-      { currentPartner: { $ne: null } },
+      {
+        currentPartner: { $ne: null },
+        isActive: true
+      },
       {
         currentPartner: null,
         paired_this_week: false
@@ -445,7 +472,10 @@ router.get("/admin/history", verifyToken, requireAdminAccess, async (req, res) =
 
     // If no history from database, provide some recent calculated data
     if (history.length === 0) {
-      const currentPairCount = Math.floor((await User.countDocuments({ currentPartner: { $ne: null } })) / 2);
+      const currentPairCount = Math.floor((await User.countDocuments({
+        currentPartner: { $ne: null },
+        isActive: true
+      })) / 2);
       
       history = [
         {
