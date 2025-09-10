@@ -453,29 +453,62 @@ router.delete('/:id', verifyToken, requireAdminAccess, async (req, res) => {
     const { id } = req.params;
 
     console.log('🗑️ Deleting video:', id);
+    console.log('🔑 Admin verification:', {
+      adminVerified: req.adminVerified,
+      adminMethod: req.adminMethod,
+      userId: req.user?.id
+    });
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.error('❌ Invalid video ID format:', id);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid video ID format'
+      });
+    }
 
     const video = await Video.findOne({ _id: id, isActive: true });
 
     if (!video) {
+      console.error('❌ Video not found or already deleted:', id);
       return res.status(404).json({
         success: false,
-        message: 'Video not found'
+        message: 'Video not found or already deleted'
       });
     }
+
+    console.log('📹 Video found:', {
+      id: video._id,
+      title: video.title,
+      status: video.status,
+      isActive: video.isActive
+    });
 
     // Soft delete
     video.isActive = false;
     video.status = 'archived';
-    await video.save();
+    const updatedVideo = await video.save();
 
-    console.log('✅ Video deleted successfully:', id);
+    console.log('✅ Video deleted successfully:', {
+      id: updatedVideo._id,
+      title: updatedVideo.title,
+      newStatus: updatedVideo.status,
+      isActive: updatedVideo.isActive
+    });
 
     // Note: In production, you should also delete the file from Cloudinary
     // This requires implementing server-side Cloudinary deletion
 
     res.json({
       success: true,
-      message: 'Video deleted successfully'
+      message: 'Video deleted successfully',
+      data: {
+        id: updatedVideo._id,
+        title: updatedVideo.title,
+        status: updatedVideo.status,
+        isActive: updatedVideo.isActive
+      }
     });
 
   } catch (error) {
