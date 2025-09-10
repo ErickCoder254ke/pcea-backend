@@ -739,24 +739,78 @@ app.delete('/api/user/delete', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Find and delete user
-    const deletedUser = await User.findByIdAndDelete(userId);
-
-    if (!deletedUser) {
+    // Find the user first to check for prayer partner relationships
+    const userToDelete = await User.findById(userId);
+    if (!userToDelete) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
 
+    // Handle prayer partner cleanup if user has a current partner
+    if (userToDelete.currentPartner) {
+      console.log(`🔗 User ${userId} has prayer partner ${userToDelete.currentPartner}, unpairing...`);
+
+      // Remove partner relationship for the current partner
+      await User.findByIdAndUpdate(userToDelete.currentPartner, {
+        currentPartner: null,
+        paired_this_week: false
+      });
+
+      console.log(`✅ Successfully unpaired partner ${userToDelete.currentPartner} from user ${userId}`);
+    }
+
+    // Also check if this user is someone else's partner and clean up
+    const partnerOfThisUser = await User.findOne({ currentPartner: userId });
+    if (partnerOfThisUser) {
+      console.log(`🔗 Found user ${partnerOfThisUser._id} who has ${userId} as partner, unpairing...`);
+
+      await User.findByIdAndUpdate(partnerOfThisUser._id, {
+        currentPartner: null,
+        paired_this_week: false
+      });
+
+      console.log(`✅ Successfully unpaired user ${partnerOfThisUser._id} from user ${userId}`);
+    }
+
+    // Clean up prayer partner requests - expire all pending requests involving this user
+    try {
+      const PrayerPartnerRequest = require('./server/models/PrayerPartnerRequest');
+
+      const requestCleanupResult = await PrayerPartnerRequest.updateMany(
+        {
+          $or: [
+            { requester: userId, status: 'pending' },
+            { recipient: userId, status: 'pending' }
+          ]
+        },
+        {
+          status: 'expired',
+          respondedAt: new Date(),
+          adminNotes: 'Auto-expired due to user self-deletion'
+        }
+      );
+
+      if (requestCleanupResult.modifiedCount > 0) {
+        console.log(`🧹 Expired ${requestCleanupResult.modifiedCount} prayer partner requests for user ${userId}`);
+      }
+    } catch (error) {
+      // Prayer partner requests model might not exist in all deployments
+      console.log('⚠️ Prayer partner requests cleanup not available:', error.message);
+    }
+
+    // Perform hard delete and clear prayer partner fields
+    const deletedUser = await User.findByIdAndDelete(userId);
+
     // Also delete user's notifications
     await Notification.deleteMany({ userId });
 
-    console.log(`�� User account deleted: ${deletedUser.name} (${deletedUser.phone})`);
+    console.log(`🗑️ User account deleted with complete prayer partner cleanup: ${deletedUser.name} (${deletedUser.phone})`);
 
     res.json({
       success: true,
-      message: "User account deleted successfully",
+      message: "User account and all prayer partner relationships deleted successfully",
     });
   } catch (err) {
     console.error("❌ Error deleting user:", err);
