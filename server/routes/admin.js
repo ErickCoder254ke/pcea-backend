@@ -436,4 +436,55 @@ router.delete('/users/:userId', verifyToken, requireAdminAccess, async (req, res
   }
 });
 
+// POST /api/admin/users/bulk-delete - Bulk delete users (Admin only)
+router.post('/users/bulk-delete', verifyToken, requireAdminAccess, async (req, res) => {
+  try {
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'userIds array is required'
+      });
+    }
+
+    // Prevent admin from deleting themselves
+    if (userIds.includes(req.user.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete your own account'
+      });
+    }
+
+    // Perform bulk soft delete (deactivate accounts)
+    const result = await User.updateMany(
+      { _id: { $in: userIds } },
+      {
+        isActive: false,
+        deletedAt: new Date(),
+        deletedBy: req.user.id
+      }
+    );
+
+    console.log(`👤 Admin ${req.user.id} bulk-deactivated ${result.modifiedCount} users`);
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} user accounts deactivated successfully`,
+      data: {
+        requested: userIds.length,
+        deletedCount: result.modifiedCount
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error bulk deleting users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to bulk delete users',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
